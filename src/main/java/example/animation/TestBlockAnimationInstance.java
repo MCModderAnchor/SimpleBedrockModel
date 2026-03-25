@@ -1,5 +1,7 @@
 package example.animation;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClocks;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
 import com.maydaymemory.mae.control.misc.RealtimeVelocityEstimatorNode;
 import com.maydaymemory.mae.control.statemachine.AnimationStateMachine;
@@ -14,22 +16,35 @@ import net.neoforged.fml.loading.FMLLoader;
  */
 public class TestBlockAnimationInstance {
     private final AnimationStateMachine<TestBlockAnimationContext> stateMachine;
+    private final AnimationClock clock;
 
     @OnlyIn(Dist.CLIENT)
     private RealtimeVelocityEstimatorNode velocityEstimatorNode;
 
     public TestBlockAnimationInstance(BlockEntity blockEntity) {
+        this.clock = FMLLoader.getDist() == Dist.CLIENT ? AnimationClocks.client() : AnimationClocks.system();
         if (FMLLoader.getDist() == Dist.CLIENT) {
-            velocityEstimatorNode = new RealtimeVelocityEstimatorNode(ArrayPoseBuilder::new, System::nanoTime);
-            stateMachine = new AnimationStateMachine<>(TestBlockStateMachineState.INSTANCE, new TestBlockAnimationContext(velocityEstimatorNode, blockEntity), System::nanoTime);
+            velocityEstimatorNode = new RealtimeVelocityEstimatorNode(ArrayPoseBuilder::new, clock);
+            stateMachine = new AnimationStateMachine<>(
+                    TestBlockStateMachineState.INSTANCE,
+                    new TestBlockAnimationContext(velocityEstimatorNode, blockEntity, clock),
+                    clock
+            );
             velocityEstimatorNode.getPoseSlot().connect(stateMachine.getOutputPort());
         } else {
-            stateMachine = new AnimationStateMachine<>(TestBlockStateMachineState.INSTANCE, new TestBlockAnimationContext(null, blockEntity), System::nanoTime);
+            stateMachine = new AnimationStateMachine<>(
+                    TestBlockStateMachineState.INSTANCE,
+                    new TestBlockAnimationContext(null, blockEntity, clock),
+                    clock
+            );
         }
     }
 
     @OnlyIn(Dist.CLIENT)
     public void renderTick() {
+        if (!clock.shouldTick()) {
+            return;
+        }
         velocityEstimatorNode.tick();
         stateMachine.tick();
     }

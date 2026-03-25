@@ -1,9 +1,11 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.exclusion.ClientOnly;
+import com.google.gson.JsonElement;
 import com.google.gson.annotations.SerializedName;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
+import java.util.Map;
 
 public class BonesItem {
     @SerializedName("cubes")
@@ -25,6 +27,10 @@ public class BonesItem {
     @SerializedName("mirror")
     @ClientOnly
     private boolean mirror = false;
+
+    @SerializedName("locators")
+    @ClientOnly
+    private Map<String, JsonElement> locators;
 
     @Nullable
     public CubesItem[] getCubes() {
@@ -49,5 +55,10 @@ public class BonesItem {
 
     public boolean isMirror() {
         return mirror;
+    }
+
+    @Nullable
+    public Map<String, JsonElement> getLocators() {
+        return locators;
     }
 }

@@ -13,6 +13,7 @@
 - ✅ **Animation Running**: A full-featured animation player.
 - ✅ **Animation Blending**: Support for blendspace, layered, kinematic interpolation blending
 - ✅ **Resource Pack Support**: Load models and animations from resource packs
+- ⌛ **SnowStorm Particle Support**: In progress...
 
 ## 🚀 Quick Start
 
@@ -165,9 +166,9 @@ Please do not reuse or redistribute them without permission.
 
 - **TartaricAcid** - Lead Developer
 - **MaydayMemory** - Core Developer
+- **xjqsh** - Core Developer
 - **MoePus** - Developer
 - **Hidomatn** - Developer
-- **xjqsh** - Developer
 
 ## 🤝 Contributing
 
@@ -188,8 +189,8 @@ We welcome contributions! Please feel free to submit issues and pull requests.
 ## 🔗 Related Projects
 
 - [MaydayAnimationEngine](https://github.com/286799714/MaydayAnimationEngine) - Providing animation infrastructure
-
----
+- [mocha](https://github.com/unnamed/mocha) - Providing molang support
+- [Particle Storm](https://github.com/westernat/ParticleStorm) - The “snowstorm particle” implementation in this project is largely inspired by this project.
 
 <div align="center">
 Made with ❤️ by the SimpleBedrockModel Team

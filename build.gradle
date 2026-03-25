@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'net.neoforged.moddev' version '2.0.+'
     id "com.modrinth.minotaur" version "2.8.7"
+    id 'me.champeau.jmh' version '0.7.2'
 }
 
 version = mod_version
@@ -89,6 +90,7 @@ repositories {
         }
     }
     mavenLocal()
+    mavenCentral()
 }
 
 dependencies {
@@ -103,6 +105,13 @@ dependencies {
     // 测试用mod
     compileOnly "curse.maven:epic-fight-mod-405076:7734081"
     runtimeOnly "curse.maven:playeranimator-658587:7389814"
+
+    // Test
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+
+    // JMH: mocha 原版 (javassist) 用于性能对比
+    jmhImplementation 'team.unnamed:mocha:3.0.1'
 }
 
 // 用于 neoforge.mods 里替换那一堆 ${xxxx}
@@ -157,6 +166,15 @@ idea {
 // 必须，编码需要显式指定为 UTF
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jmh {
+    zip64 = true
+    jmhVersion = '1.37'
 }
 
 java {

@@ -2,6 +2,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.util;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -76,13 +77,52 @@ public final class RenderHelper {
         EntityRenderDispatcher renderManager = mc.getEntityRenderDispatcher();
         PlayerRenderer renderer = (PlayerRenderer) renderManager.getRenderer(player);
         MultiBufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-        int oldId = RenderSystem.getShaderTexture(0);
-        RenderSystem.setShaderTexture(0, player.getSkin().texture());
 
         if (hand == HumanoidArm.RIGHT) {
             renderer.renderRightHand(matrixStack, buffer, combinedLight, player);
         } else {
             renderer.renderLeftHand(matrixStack, buffer, combinedLight, player);
         }
+    }
+
+    /**
+     * 将第一人称模型空间中的局部坐标转换为 Minecraft 绝对世界坐标。
+     * <p>
+     * 典型用法：传入骨骼的 globalTransform 变换后的坐标（或直接传 locator 坐标），
+     * 得到该点在 Minecraft 世界中的绝对位置。
+     *
+     * @param localX         模型空间中的 X 坐标
+     * @param localY         模型空间中的 Y 坐标
+     * @param localZ         模型空间中的 Z 坐标
+     * @param modelTransform 第一人称模型变换矩阵（antibob × gunOffset），即 identity → 视图空间的变换
+     * @param poseInitial    RenderHandEvent 的 poseStack 初始 pose
+     * @param camera         当前摄像机
+     * @return 绝对世界坐标
+     */
+    public static Vec3 firstPersonToWorld(float localX, float localY, float localZ,
+                                          Matrix4f modelTransform, Matrix4f poseInitial,
+                                          Camera camera) {
+        // modelTransform × localPos → 视图空间
+        // cameraRotInv × poseInitial × 视图空间坐标 → 以摄像机为原点的世界对齐坐标
+        // + camera.getPosition() → 绝对世界坐标
+        Matrix4f cameraRotInv = new Matrix4f(buildCameraRotation(camera)).invert();
+        Matrix4f toWorldAligned = new Matrix4f(cameraRotInv).mul(poseInitial).mul(modelTransform);
+
+        float wx = toWorldAligned.m00() * localX + toWorldAligned.m10() * localY + toWorldAligned.m20() * localZ + toWorldAligned.m30();
+        float wy = toWorldAligned.m01() * localX + toWorldAligned.m11() * localY + toWorldAligned.m21() * localZ + toWorldAligned.m31();
+        float wz = toWorldAligned.m02() * localX + toWorldAligned.m12() * localY + toWorldAligned.m22() * localZ + toWorldAligned.m32();
+
+        Vec3 camPos = camera.getPosition();
+        return new Vec3(wx + camPos.x, wy + camPos.y, wz + camPos.z);
+    }
+
+    /**
+     * 用摄像机的 pitch/yaw 构建视图旋转矩阵（与 Minecraft 内部一致）。
+     * Minecraft 的视图矩阵构建顺序：先绕 X 旋转 pitch，再绕 Y 旋转 (yaw + 180)。
+     */
+    public static Matrix4f buildCameraRotation(Camera camera) {
+        return new Matrix4f()
+                .rotationX((float) Math.toRadians(camera.getXRot()))
+                .rotateY((float) Math.toRadians(camera.getYRot() + 180f));
     }
 }

@@ -6,8 +6,10 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.exclusion
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.AnimationKeyframes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.CubesItem;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.ParticleEffectKeyframes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.SoundEffectKeyframes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.serialize.AnimationKeyframesSerializer;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.serialize.ParticleEffectKeyframesSerializer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.serialize.SoundEffectKeyframesSerializer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.serialize.Vector3fSerializer;
 import com.google.gson.Gson;
@@ -22,13 +24,15 @@ public class GsonUtil {
             .registerTypeAdapter(Vector3f.class, new Vector3fSerializer())
             .registerTypeAdapter(AnimationKeyframes.class, new AnimationKeyframesSerializer())
             .registerTypeAdapter(SoundEffectKeyframes.class, new SoundEffectKeyframesSerializer())
+            .registerTypeAdapter(ParticleEffectKeyframes.class, new ParticleEffectKeyframesSerializer())
             .create();
 
     public static final Gson SERVER_NORMAL_GSON = new GsonBuilder()
             .addDeserializationExclusionStrategy(new ServerNormalExclusionStrategy())
-            .registerTypeAdapter(BedrockModelPOJO.class, new NullAdapter<>()) // 常规情况下服务端无需加载模型
+            .registerTypeAdapter(BedrockModelPOJO.class, new NullAdapter<>())
             .registerTypeAdapter(ResourceLocation.class, new ResourceLocation.Serializer())
             .registerTypeAdapter(SoundEffectKeyframes.class, new SoundEffectKeyframesSerializer())
+            .registerTypeAdapter(ParticleEffectKeyframes.class, new ParticleEffectKeyframesSerializer())
             .create();
 
     public static final Gson SERVER_GSON_FOR_ROOT_MOTION = new GsonBuilder()
@@ -37,5 +41,6 @@ public class GsonUtil {
             .registerTypeAdapter(Vector3f.class, new Vector3fSerializer())
             .registerTypeAdapter(AnimationKeyframes.class, new AnimationKeyframesSerializer())
             .registerTypeAdapter(SoundEffectKeyframes.class, new SoundEffectKeyframesSerializer())
+            .registerTypeAdapter(ParticleEffectKeyframes.class, new ParticleEffectKeyframesSerializer())
             .create();
 }

@@ -1,5 +1,7 @@
 package example.animation;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClocks;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.SimpleAnimationState;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.SimpleTransition;
 import com.maydaymemory.mae.control.statemachine.AnimationStateMachine;
@@ -7,8 +9,11 @@ import example.entity.Zti;
 
 public class ZtiAnimationInstance {
     private final AnimationStateMachine<ZtiAnimationContext> stateMachine;
+    private final AnimationClock clock;
 
     public ZtiAnimationInstance(Zti entity) {
+        this.clock = AnimationClocks.client();
+
         SimpleAnimationState<ZtiAnimationContext> idle = new SimpleAnimationState.Builder<ZtiAnimationContext>()
                 .evaluatePose(ZtiAnimationContext::evaluateCurrentPose)
                 .build();
@@ -55,12 +60,15 @@ public class ZtiAnimationInstance {
                 .afterTrigger(ctx -> ctx.playLooping(ctx.idleAnimation()))
                 .build();
 
-        ZtiAnimationContext context = new ZtiAnimationContext(entity);
+        ZtiAnimationContext context = new ZtiAnimationContext(entity, clock);
         context.playLooping(context.idleAnimation());
-        this.stateMachine = new AnimationStateMachine<>(idle, context, System::nanoTime);
+        this.stateMachine = new AnimationStateMachine<>(idle, context, clock);
     }
 
     public void renderTick() {
+        if (!clock.shouldTick()) {
+            return;
+        }
         stateMachine.getContext().tick();
         stateMachine.tick();
     }

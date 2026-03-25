@@ -19,6 +19,9 @@ public class BedrockAnimationPOJO {
     @SerializedName("sound_effects")
     private SoundEffectKeyframes soundEffects;
 
+    @SerializedName("particle_effects")
+    private ParticleEffectKeyframes particleEffects;
+
     public boolean isLoop() {
         return loop;
     }
@@ -33,5 +36,9 @@ public class BedrockAnimationPOJO {
 
     public SoundEffectKeyframes getSoundEffects() {
         return soundEffects;
+    }
+
+    public ParticleEffectKeyframes getParticleEffects() {
+        return particleEffects;
     }
 }

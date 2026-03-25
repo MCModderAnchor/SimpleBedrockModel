@@ -293,4 +293,27 @@ public class MathUtil {
         float h4 = t3 - t2;
         return h1 * y[1] + h2 * y[2] + h3 * v0 + h4 * v1;
     }
+
+    /**
+     * 计算从单位向量 from 到单位向量 to 的最短旋转四元数。<br/>
+     * 参考自 ParticleStorm
+     */
+    public static Quaternionf setFromUnitVectors(Vector3f from, Vector3f to, Quaternionf dest) {
+        float dot = from.dot(to) + 1.0f;
+        if (dot < 1e-6f) {
+            if (Math.abs(from.x) > Math.abs(from.z)) {
+                dest.set(-from.y, from.x, 0, 0);
+            } else {
+                dest.set(0, -from.z, from.y, 0);
+            }
+        } else {
+            dest.set(
+                    from.y * to.z - from.z * to.y,
+                    from.z * to.x - from.x * to.z,
+                    from.x * to.y - from.y * to.x,
+                    dot
+            );
+        }
+        return dest.normalize();
+    }
 }

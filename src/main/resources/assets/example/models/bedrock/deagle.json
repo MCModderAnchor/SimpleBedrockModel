@@ -6,7 +6,7 @@
 				"identifier": "geometry.deagle_50_cc",
 				"texture_width": 256,
 				"texture_height": 256,
-				"visible_bounds_width": 3,
+				"visible_bounds_width": 4,
 				"visible_bounds_height": 3,
 				"visible_bounds_offset": [0, 0.5, 0]
 			},
@@ -1297,7 +1297,10 @@
 				{
 					"name": "muzzle_pos",
 					"parent": "Deagle",
-					"pivot": [0, 5.875, -2.96875]
+					"pivot": [0, 5.875, -2.96875],
+					"locators": {
+						"locator": [0, 5.875, -2.96875]
+					}
 				},
 				{
 					"name": "scope_pos",

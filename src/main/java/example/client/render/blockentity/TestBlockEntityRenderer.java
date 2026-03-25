@@ -9,6 +9,7 @@ import com.maydaymemory.mae.basic.ZYXBoneTransformFactory;
 import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
+import example.animation.MolangTestAnimationContext;
 import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
@@ -51,13 +52,28 @@ public class TestBlockEntityRenderer extends BedrockModelBlockEntityRenderer<Tes
     @Override
     public void render(@NotNull TestBlockEntity blockEntity, float partialTick, @NotNull PoseStack poseStack,
                        @NotNull MultiBufferSource buffer, int packedLight, int packedOverlay) {
-        TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
-        animationInstance.renderTick();
-        Pose animationPose = animationInstance.getStateMachine().getPose();
         BedrockModel model = modelSupplier.get();
-        Pose bindPose = model.getBindPose();
-        Pose blended = BLENDER.blend(bindPose, animationPose);
-        model.applyPose(blended);
+        if (model == null) {
+            return;
+        }
+
+        // 尝试使用 Molang 测试动画（通过 AnimationRunner 驱动）
+        MolangTestAnimationContext.tick();
+        Pose molangPose = MolangTestAnimationContext.evaluatePose();
+        if (molangPose != null) {
+            Pose bindPose = model.getBindPose();
+            Pose blended = BLENDER.blend(bindPose, molangPose);
+            model.applyPose(blended);
+        } else {
+            // 回退到原有的状态机动画
+            TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
+            animationInstance.renderTick();
+            Pose animationPose = animationInstance.getStateMachine().getPose();
+            Pose bindPose = model.getBindPose();
+            Pose blended = BLENDER.blend(bindPose, animationPose);
+            model.applyPose(blended);
+        }
+
         super.render(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay);
     }
 }

@@ -29,7 +29,7 @@ public class TestBlockStateMachineState implements IAnimationState<TestBlockAnim
     public void onEnter(TestBlockAnimationContext testBlockAnimationContext, IAnimationState<TestBlockAnimationContext> iAnimationState) {
         AnimationRunner runner = testBlockAnimationContext.getRunner();
         if (runner != null) {
-            runner.setState(new LoopingState(System::nanoTime));
+            runner.setState(new LoopingState(testBlockAnimationContext.getClock()));
         }
     }
 
@@ -83,6 +83,7 @@ public class TestBlockStateMachineState implements IAnimationState<TestBlockAnim
             testBlockAnimationContext.snapshotVelocity();
             BedrockAnimation animation = testBlockAnimationContext.nextAnimation();
             AnimationRunner runner = new AnimationRunner(animation, new AnimationContext(animation.getSpecifiedEndTimeS()));
+            runner.setState(new LoopingState(testBlockAnimationContext.getClock()));
             testBlockAnimationContext.setRunner(runner);
         }
 

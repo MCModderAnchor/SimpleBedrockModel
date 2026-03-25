@@ -1,12 +1,30 @@
 package example.animation;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClocks;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.ParticleEffectData;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationReloadListenerEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelReloadListenerEvent;
-import com.maydaymemory.mae.basic.*;
-import com.maydaymemory.mae.blend.*;
-import com.maydaymemory.mae.control.montage.*;
+import com.maydaymemory.mae.basic.ArrayClipChannel;
+import com.maydaymemory.mae.basic.ArrayPoseBuilder;
+import com.maydaymemory.mae.basic.Keyframe;
+import com.maydaymemory.mae.basic.Pose;
+import com.maydaymemory.mae.basic.ZYXBoneTransformFactory;
+import com.maydaymemory.mae.blend.EulerAdditiveBlender;
+import com.maydaymemory.mae.blend.SkeletonDescendantAccessorAdapter;
+import com.maydaymemory.mae.blend.LayerBlend;
+import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
+import com.maydaymemory.mae.blend.SkeletonBaseLayerBlend;
+import com.maydaymemory.mae.control.montage.AnimationMontage;
+import com.maydaymemory.mae.control.montage.AnimationMontageRunner;
+import com.maydaymemory.mae.control.montage.AnimationMontageSection;
+import com.maydaymemory.mae.control.montage.AnimationMontageTrack;
+import com.maydaymemory.mae.control.montage.AnimationNotifyKeyframe;
+import com.maydaymemory.mae.control.montage.AnimationSegment;
+import com.maydaymemory.mae.control.montage.AnimationSegmentKeyframe;
+import com.maydaymemory.mae.control.montage.IAnimationNotify;
 import example.resource.KnownResources;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -18,11 +36,17 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.loading.FMLLoader;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
-public class DeagleAnimationGraph implements GunAnimationGraph{
-    private static final EulerAdditiveBlender eulerAdditiveBlender = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
+@Mod.EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+public class DeagleAnimationGraph implements GunAnimationGraph {
+    private static final EulerAdditiveBlender EULER_ADDITIVE_BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
     private static Map<String, BedrockAnimation> animations;
     private static BedrockModel model;
@@ -44,19 +68,18 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
     }
 
     private final FPGunAnimationInstance animationInstance;
-
+    private final AnimationClock clock;
     private final Deque<AnimationMontageRunner<FPGunAnimationInstance>> shootMontageRunners = new LinkedList<>();
+    private final List<ParticleEffectData> pendingParticles = new ArrayList<>();
+
     private AnimationMontage<FPGunAnimationInstance> shootMontage;
     private AnimationMontageRunner<FPGunAnimationInstance> drawMontageRunner;
-
     private SkeletonBaseLayerBlend handAndRootLayer;
     private LayerBlend noHandLayer;
 
-
     public DeagleAnimationGraph(FPGunAnimationInstance animationInstance) {
         this.animationInstance = animationInstance;
-        // 动画资产在这里是每次创建 graph 都重新获取、构建一遍。生产环境中也许需要找个合适的地方将他们缓存起来。
-        // 初始化 layer，只参与混合，所以只需要客户端执行
+        this.clock = AnimationClocks.client();
         if (FMLLoader.getDist() == Dist.CLIENT) {
             handAndRootLayer = new SkeletonBaseLayerBlend(new SkeletonDescendantAccessorAdapter(model));
             handAndRootLayer.addControlPoint(model.getIndex("root"), 0, 1f);
@@ -65,6 +88,7 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
             noHandLayer = new LayerBlend() {
                 final int leftHandIndex = model.getIndex("lefthand");
                 final int rightHandIndex = model.getIndex("righthand");
+
                 @Override
                 public float getWeight(int boneIndex) {
                     if (leftHandIndex == boneIndex || rightHandIndex == boneIndex) {
@@ -97,10 +121,10 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
         drawMontage.setSections(drawMontageSections);
 
         ArrayList<Keyframe<IAnimationNotify<FPGunAnimationInstance>>> drawNotifies = new ArrayList<>();
-        drawNotifies.add(new AnimationNotifyKeyframe<>(0.3f, ctx -> ctx.setRaisingGun(false))); // raising gun 为 false 就可以开枪换弹了
+        drawNotifies.add(new AnimationNotifyKeyframe<>(0.3f, ctx -> ctx.setRaisingGun(false)));
         drawMontage.setNotifyChannels(List.of(new ArrayClipChannel<>(drawNotifies)));
 
-        drawMontageRunner = new AnimationMontageRunner<>(drawMontage, animationInstance, new ZYXBoneTransformFactory(), ArrayPoseBuilder::new, System::nanoTime);
+        drawMontageRunner = new AnimationMontageRunner<>(drawMontage, animationInstance, new ZYXBoneTransformFactory(), ArrayPoseBuilder::new, clock);
     }
 
     private void initializeShootMontage() {
@@ -151,20 +175,22 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
 
     @Override
     public void notifyTrigger() {
-        if (animationInstance.isCooling() || animationInstance.isRaisingGun() || animationInstance.getAmmoInGun() < 1) {
+        if (animationInstance.isCooling() || animationInstance.isRaisingGun()) {
             return;
         }
         // 设置正在冷却。动画中的 notify 会在合适时机将冷却设置为 false
         animationInstance.setCooling(true);
-        // 播放射击动画
-        AnimationMontageRunner<FPGunAnimationInstance> shootRunner = new AnimationMontageRunner<>(shootMontage, animationInstance, new ZYXBoneTransformFactory(), ArrayPoseBuilder::new, System::nanoTime);
+        // 播放射击动画（粒子触发由动画通道的 particle_effects 关键帧驱动）
+        AnimationMontageRunner<FPGunAnimationInstance> shootRunner = new AnimationMontageRunner<>(shootMontage, animationInstance, new ZYXBoneTransformFactory(), ArrayPoseBuilder::new, clock);
         shootRunner.start("shoot");
         shootMontageRunners.push(shootRunner);
     }
 
     @Override
     public void tick() {
-        // tick draw montage runner
+        if (!clock.shouldTick()) {
+            return;
+        }
         drawMontageRunner.tick();
         consumeSounds(drawMontageRunner.clip(BedrockAnimation.SOUND_CHANNEL_NAME));
         // 弹掉已经播放完的 shoot montage runner
@@ -180,6 +206,7 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
         for (AnimationMontageRunner<FPGunAnimationInstance> shootRunner : shootMontageRunners) {
             shootRunner.tick();
             consumeSounds(shootRunner.clip(BedrockAnimation.SOUND_CHANNEL_NAME));
+            consumeParticleKeyframes(shootRunner.clip(BedrockAnimation.PARTICLE_CHANNEL_NAME));
         }
     }
 
@@ -194,7 +221,7 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
                 animationPose = shootRunner.getPose();
             }
         }
-        return eulerAdditiveBlender.blend(model.getBindPose(), animationPose);
+        return EULER_ADDITIVE_BLENDER.blend(model.getBindPose(), animationPose);
     }
 
     private void consumeSounds(Iterable<Keyframe<ResourceLocation>> sounds) {
@@ -204,5 +231,26 @@ public class DeagleAnimationGraph implements GunAnimationGraph{
             SoundEvent soundEvent = SoundEvent.createVariableRangeEvent(keyframe.getValue());
             level.playSound(player, player, soundEvent, SoundSource.PLAYERS, 1.0f, 1.0f);
         }
+    }
+
+    private void consumeParticleKeyframes(Iterable<? extends Keyframe<?>> particles) {
+        for (Keyframe<?> keyframe : particles) {
+            Object value = keyframe.getValue();
+            if (value instanceof ParticleEffectData data) {
+                pendingParticles.add(data);
+            }
+        }
+    }
+
+    /**
+     * 获取并清空待发射的粒子效果列表。
+     */
+    public List<ParticleEffectData> consumePendingParticles() {
+        if (pendingParticles.isEmpty()) {
+            return List.of();
+        }
+        List<ParticleEffectData> result = new ArrayList<>(pendingParticles);
+        pendingParticles.clear();
+        return result;
     }
 }

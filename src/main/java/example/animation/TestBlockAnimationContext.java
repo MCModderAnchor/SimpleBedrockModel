@@ -1,5 +1,6 @@
 package example.animation;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationReloadListenerEvent;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
@@ -52,6 +53,7 @@ public class TestBlockAnimationContext implements Tickable {
     }
 
     private final BlockEntity blockEntity;
+    private final AnimationClock clock;
 
     private int currentAnimationIndex = 0;
     public boolean needTransition = false;
@@ -62,12 +64,13 @@ public class TestBlockAnimationContext implements Tickable {
     private AnimationRunner runner;
     private Pose velocitySnapshot;
 
-    public TestBlockAnimationContext(RealtimeVelocityEstimatorNode velocityEstimatorNode, BlockEntity blockEntity) {
+    public TestBlockAnimationContext(RealtimeVelocityEstimatorNode velocityEstimatorNode, BlockEntity blockEntity, AnimationClock clock) {
         this.velocityEstimatorNode = velocityEstimatorNode;
         this.targetVelocityEstimatorNode = new AnimationVelocityEstimatorNode(ArrayPoseBuilder::new);
         targetVelocityEstimatorNode.getAnimationSlot().connect(this::currentAnimation);
         targetVelocityEstimatorNode.getTimeSlot().connect(() -> getRunner().getProgressInSecond());
         this.blockEntity = blockEntity;
+        this.clock = clock;
     }
 
     public BedrockAnimation nextAnimation() {
@@ -101,8 +104,15 @@ public class TestBlockAnimationContext implements Tickable {
         this.runner = runner;
     }
 
+    public AnimationClock getClock() {
+        return clock;
+    }
+
     @Override
     public void tick() {
+        if (!clock.shouldTick()) {
+            return;
+        }
         if (runner != null) {
             runner.tick();
             Level level = blockEntity.getLevel();

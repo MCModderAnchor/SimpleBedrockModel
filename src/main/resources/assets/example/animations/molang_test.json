@@ -1,0 +1,23 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"molang_test": {
+			"loop": true,
+			"animation_length": 2.0,
+			"bones": {
+				"root": {
+					"position": {
+						"0.0": [0, "math.sin(query.anim_time * 360) * 3", 0],
+						"1.0": [0, "math.cos(query.anim_time * 360) * 3", 0],
+						"2.0": [0, "math.sin(query.anim_time * 360) * 3", 0]
+					},
+					"rotation": {
+						"0.0": [0, 0, "math.sin(query.anim_time * 180) * 15"],
+						"1.0": [0, 0, "math.cos(query.anim_time * 180) * 15"],
+						"2.0": [0, 0, "math.sin(query.anim_time * 180) * 15"]
+					}
+				}
+			}
+		}
+	}
+}

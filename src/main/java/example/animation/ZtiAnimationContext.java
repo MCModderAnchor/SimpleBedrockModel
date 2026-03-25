@@ -1,11 +1,16 @@
 package example.animation;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationReloadListenerEvent;
 import com.maydaymemory.mae.basic.DummyPose;
 import com.maydaymemory.mae.basic.Pose;
 import com.maydaymemory.mae.control.Tickable;
-import com.maydaymemory.mae.control.runner.*;
+import com.maydaymemory.mae.control.runner.AnimationContext;
+import com.maydaymemory.mae.control.runner.AnimationRunner;
+import com.maydaymemory.mae.control.runner.LoopingState;
+import com.maydaymemory.mae.control.runner.PlayingState;
+import com.maydaymemory.mae.control.runner.StopState;
 import example.client.render.entity.ZtiRenderer;
 import example.entity.Zti;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -42,11 +47,13 @@ public class ZtiAnimationContext implements Tickable {
     }
 
     private final Zti entity;
+    private final AnimationClock clock;
     private AnimationRunner runner;
     private boolean previousAttackActive;
 
-    public ZtiAnimationContext(Zti entity) {
+    public ZtiAnimationContext(Zti entity, AnimationClock clock) {
         this.entity = entity;
+        this.clock = clock;
     }
 
     public BedrockAnimation idleAnimation() {
@@ -63,12 +70,12 @@ public class ZtiAnimationContext implements Tickable {
 
     public void playLooping(BedrockAnimation animation) {
         runner = new AnimationRunner(animation, new AnimationContext(animation.getSpecifiedEndTimeS()));
-        runner.setState(new LoopingState(System::nanoTime));
+        runner.setState(new LoopingState(clock));
     }
 
     public void playOnce(BedrockAnimation animation) {
         runner = new AnimationRunner(animation, new AnimationContext(animation.getSpecifiedEndTimeS()));
-        runner.setState(new PlayingState(System::nanoTime, StopState::new));
+        runner.setState(new PlayingState(clock, StopState::new));
     }
 
     public boolean isMoving() {
@@ -90,8 +97,15 @@ public class ZtiAnimationContext implements Tickable {
         return runner == null ? DummyPose.INSTANCE : runner.evaluate();
     }
 
+    public AnimationClock getClock() {
+        return clock;
+    }
+
     @Override
     public void tick() {
+        if (!clock.shouldTick()) {
+            return;
+        }
         if (runner != null) {
             runner.tick();
         }

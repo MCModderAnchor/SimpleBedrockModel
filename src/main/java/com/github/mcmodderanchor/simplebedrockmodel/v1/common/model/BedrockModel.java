@@ -9,6 +9,9 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.Sodi
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.*;
 import com.google.common.collect.Collections2;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.maydaymemory.mae.basic.*;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -20,7 +23,7 @@ import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.*;
 
@@ -220,6 +223,7 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
                 root.addChild(part);
             }
             // 塞入 cubes
+            part.setLocators(parseLocators(bone, part));
             if (bone.getCubes() != null) {
                 for (CubesItem cube : bone.getCubes()) {
                     float[] uv = cube.getUv();
@@ -282,6 +286,54 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
         convertPivot(root);
     }
 
+    private Map<String, LocatorData> parseLocators(BonesItem bone, BedrockBone part) {
+        Map<String, JsonElement> locators = bone.getLocators();
+        if (locators == null || locators.isEmpty()) {
+            return Map.of();
+        }
+        // 此时 part.x/y/z 是绝对坐标（已做左手系转换，尚未 convertPivot）
+        // locator offset 也是绝对坐标（Bedrock 左手系），需要转换为相对于骨骼 pivot 的偏移
+        Map<String, LocatorData> parsed = new HashMap<>();
+        for (Map.Entry<String, JsonElement> entry : locators.entrySet()) {
+            parsed.put(entry.getKey(), parseLocator(entry.getValue(), part));
+        }
+        return Map.copyOf(parsed);
+    }
+
+    private LocatorData parseLocator(JsonElement element, BedrockBone part) {
+        if (element == null || element.isJsonNull()) {
+            return LocatorData.EMPTY;
+        }
+        if (element.isJsonArray()) {
+            float[] absOffset = parseLocatorArray(element.getAsJsonArray());
+            // 左手系转右手系，然后减去骨骼的绝对 pivot 得到相对偏移
+            float relX = -absOffset[0] - part.x;
+            float relY = absOffset[1] - part.y;
+            float relZ = absOffset[2] - part.z;
+            return new LocatorData(new float[]{relX, relY, relZ}, new float[3]);
+        }
+        if (element.isJsonObject()) {
+            JsonObject object = element.getAsJsonObject();
+            float[] absOffset = object.has("offset") ? parseLocatorArray(object.getAsJsonArray("offset")) : new float[3];
+            float[] rotation = object.has("rotation") ? parseLocatorArray(object.getAsJsonArray("rotation")) : new float[3];
+            // 左手系转右手系，然后减去骨骼的绝对 pivot 得到相对偏移
+            float relX = -absOffset[0] - part.x;
+            float relY = absOffset[1] - part.y;
+            float relZ = absOffset[2] - part.z;
+            return new LocatorData(new float[]{relX, relY, relZ}, rotation);
+        }
+        return LocatorData.EMPTY;
+    }
+
+    private float[] parseLocatorArray(JsonArray array) {
+        float[] values = new float[3];
+        int size = Math.min(array.size(), values.length);
+        for (int i = 0; i < size; i++) {
+            values[i] = array.get(i).getAsFloat();
+        }
+        return values;
+    }
+
     @Override
     public Collection<Integer> getChildren(int i) {
         BedrockBone part = boneIndex.get(i);
@@ -338,6 +390,61 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
     public BedrockBone getBone(String boneName) {
         return boneMap.get(boneName);
     }
+
+    /**
+     * 在模型中查找指定名称的 locator。遍历所有骨骼的 locator 映射。
+     *
+     * @param locatorName locator 名称
+     * @return 包含骨骼和 locator 数据的结果，未找到时返回 null
+     */
+    @Nullable
+    public LocatorResult findLocator(String locatorName) {
+        for (BedrockBone bone : boneIndex) {
+            Map<String, LocatorData> locators = bone.getLocators();
+            if (locators.containsKey(locatorName)) {
+                return new LocatorResult(bone, locators.get(locatorName));
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 获取 locator 的完整变换矩阵（骨骼全局变换 × locator 偏移和旋转）。
+     *
+     * @param locatorName locator 名称
+     * @return 变换矩阵，未找到时返回 null
+     */
+    @Nullable
+    public Matrix4f getLocatorTransform(String locatorName) {
+        LocatorResult result = findLocator(locatorName);
+        if (result == null) return null;
+
+        Matrix4f transform = result.bone().getGlobalTransform();
+        LocatorData locator = result.locator();
+
+        // 应用 locator 偏移（Bedrock 坐标单位是像素，需要 /16）
+        float[] offset = locator.offset();
+        if (offset[0] != 0 || offset[1] != 0 || offset[2] != 0) {
+            transform.translate(offset[0] / 16f, offset[1] / 16f, offset[2] / 16f);
+        }
+
+        // 应用 locator 旋转（度转弧度，ZYX 顺序）
+        float[] rotation = locator.rotation();
+        if (rotation[0] != 0 || rotation[1] != 0 || rotation[2] != 0) {
+            Quaternionf q = new Quaternionf()
+                    .rotateZ((float) Math.toRadians(rotation[2]))
+                    .rotateY((float) Math.toRadians(rotation[1]))
+                    .rotateX((float) Math.toRadians(rotation[0]));
+            transform.rotate(q);
+        }
+
+        return transform;
+    }
+
+    /**
+     * locator 查找结果。
+     */
+    public record LocatorResult(BedrockBone bone, LocatorData locator) {}
 
     private record BindRotationView(Quaternionfc quaternion, Vector3fc euler) implements RotationView {
         private BindRotationView(Quaternionfc quaternion, Vector3fc euler) {

@@ -35,6 +35,7 @@ public class ReloadListenersRegister {
 
             event.registerReloadListener(BedrockModelResourceSet.INSTANCE);
             event.registerReloadListener(BedrockAnimationResourceSet.INSTANCE);
+            event.registerReloadListener(ParticleDefinitionLoader.getInstance());
         }
     }
 
