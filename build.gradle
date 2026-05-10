@@ -102,6 +102,9 @@ dependencies {
         exclude group: 'org.joml', module: 'joml'
     }
 
+    compileOnly fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
+    runtimeOnly fg.deobf("curse.maven:configured-457570:5180900")
+
     // 测试用mod
     compileOnly "curse.maven:epic-fight-mod-405076:7734081"
     runtimeOnly "curse.maven:playeranimator-658587:7389814"
@@ -193,4 +196,29 @@ modrinth {
     gameVersions = [minecraft_version]
     loaders = ["neoforge"]
     //debugMode = true
+}
+
+tasks.register("runWithRenderDoc", Exec) {
+    commandLine = [
+            "D:\\tools\\RenderDoc_1.44_64\\renderdoccmd.exe",
+            "capture",
+            "--opt-hook-children",
+            "--wait-for-exit",
+            "--working-dir",
+            projectDir.absolutePath,
+
+            "C:\\Windows\\System32\\cmd.exe",
+            "/c",
+            file("gradlew.bat").absolutePath,
+            "--no-daemon",
+            "runClient"
+    ]
+
+    doFirst {
+        println "=== RenderDoc gradlew command ==="
+        println commandLine.collect {
+            it.toString().contains(" ") ? "\"${it}\"" : it
+        }.join(" ")
+        println "================================="
+    }
 }

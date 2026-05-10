@@ -36,7 +36,7 @@ public class TestBlock extends HorizontalDirectionalBlock implements EntityBlock
                 .mapColor(MapColor.PODZOL)
                 .strength(2.0F)
                 .sound(SoundType.WOOD)
-                .lightLevel(s -> 15)
+                .lightLevel(s -> 0)
                 .noOcclusion()
                 .ignitedByLava());
         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));

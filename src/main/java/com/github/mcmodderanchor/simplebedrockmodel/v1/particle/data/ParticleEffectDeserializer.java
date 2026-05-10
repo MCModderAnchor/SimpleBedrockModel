@@ -101,11 +101,20 @@ public class ParticleEffectDeserializer {
     private Map<String, List<IEventNode>> parseEvents(JsonObject obj, ParticleMolangEnvironment molang) {
         Map<String, List<IEventNode>> events = new LinkedHashMap<>();
         for (Map.Entry<String, JsonElement> entry : obj.entrySet()) {
-            if (entry.getValue().isJsonObject()) {
-                List<IEventNode> nodes = parseEventNodeObject(entry.getValue().getAsJsonObject(), molang);
-                if (!nodes.isEmpty()) {
-                    events.put(entry.getKey(), nodes);
+            List<IEventNode> nodes = new ArrayList<>();
+            if (entry.getValue().isJsonArray()) {
+                // 数组形式: "event": [ { "particle_effect": {...} }, ... ]
+                for (JsonElement elem : entry.getValue().getAsJsonArray()) {
+                    if (elem.isJsonObject()) {
+                        nodes.addAll(parseEventNodeObject(elem.getAsJsonObject(), molang));
+                    }
                 }
+            } else if (entry.getValue().isJsonObject()) {
+                // 对象形式: "event": { "particle_effect": {...} }
+                nodes.addAll(parseEventNodeObject(entry.getValue().getAsJsonObject(), molang));
+            }
+            if (!nodes.isEmpty()) {
+                events.put(entry.getKey(), nodes);
             }
         }
         return events.isEmpty() ? null : events;

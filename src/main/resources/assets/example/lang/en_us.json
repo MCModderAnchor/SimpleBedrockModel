@@ -1,6 +1,7 @@
 {
   "item_group.example.name": "Example",
   "block.example.test_block": "Example Block",
+  "block.example.poly_mesh_test_block": "Poly Mesh Test Block",
   "item.example.deagle": "Deagle",
   "sounds.subtitle.step": "Step",
   "sounds.subtitle.deagle_shoot": "Deagle shoot",

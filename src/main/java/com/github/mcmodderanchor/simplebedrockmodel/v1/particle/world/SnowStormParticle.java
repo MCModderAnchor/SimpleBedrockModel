@@ -4,6 +4,8 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleDes
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleEffectDefinition;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.*;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.motion.*;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumParticleVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.util.math.MathUtil;
@@ -240,6 +242,8 @@ public class SnowStormParticle extends TextureSheetParticle {
     private static final Vector3f TEMP_VEC = new Vector3f();
     private static final Vector3f TEMP_VEC2 = new Vector3f();
     private static final Vector3f TEMP_VEC3 = new Vector3f();
+    private static final Vector3f AXIS_X = new Vector3f();
+    private static final Vector3f AXIS_Y = new Vector3f();
     private static final Vector4f TEMP_VEC4 = new Vector4f();
     private static final Matrix4f TEMP_MAT = new Matrix4f();
     private static final Matrix3f TEMP_MAT3 = new Matrix3f();
@@ -273,16 +277,44 @@ public class SnowStormParticle extends TextureSheetParticle {
 
         int light = getLightColor(partialTicks);
 
-        renderVertex(buffer, cx, cy, cz, -hw, -hh, u0, v1, light);
-        renderVertex(buffer, cx, cy, cz, -hw, hh, u0, v0, light);
-        renderVertex(buffer, cx, cy, cz, hw, hh, u1, v0, light);
-        renderVertex(buffer, cx, cy, cz, hw, -hh, u1, v1, light);
+        AXIS_X.set(1, 0, 0).rotate(QUATERNION).mul(hw);
+        AXIS_Y.set(0, 1, 0).rotate(QUATERNION).mul(hh);
+
+        float ax = AXIS_X.x(), ay = AXIS_X.y(), az = AXIS_X.z();
+        float bx = AXIS_Y.x(), by = AXIS_Y.y(), bz = AXIS_Y.z();
+
+        float x0 = cx - ax - bx;
+        float y0 = cy - ay - by;
+        float z0 = cz - az - bz;
+        float x1 = cx - ax + bx;
+        float y1 = cy - ay + by;
+        float z1 = cz - az + bz;
+        float x2 = cx + ax + bx;
+        float y2 = cy + ay + by;
+        float z2 = cz + az + bz;
+        float x3 = cx + ax - bx;
+        float y3 = cy + ay - by;
+        float z3 = cz + az - bz;
+
+        if (SodiumCompat.isSodiumInstalled() && SodiumParticleVertexWriter.tryRender(
+                buffer,
+                x0, y0, z0, u0, v1,
+                x1, y1, z1, u0, v0,
+                x2, y2, z2, u1, v0,
+                x3, y3, z3, u1, v1,
+                rCol, gCol, bCol, alpha, light)) {
+            return;
+        }
+
+
+        renderVertex(buffer, x0, y0, z0, u0, v1, light);
+        renderVertex(buffer, x1, y1, z1, u0, v0, light);
+        renderVertex(buffer, x2, y2, z2, u1, v0, light);
+        renderVertex(buffer, x3, y3, z3, u1, v1, light);
     }
 
-    private void renderVertex(VertexConsumer buffer, float cx, float cy, float cz,
-                               float xOff, float yOff, float u, float v, int light) {
-        TEMP_VEC.set(xOff, yOff, 0).rotate(QUATERNION).add(cx, cy, cz);
-        buffer.addVertex(TEMP_VEC.x(), TEMP_VEC.y(), TEMP_VEC.z())
+    private void renderVertex(VertexConsumer buffer, float x, float y, float z, float u, float v, int light) {
+        buffer.addVertex(x, y, z)
                 .setUv(u, v)
                 .setColor(rCol, gCol, bCol, alpha)
                 .setLight(light);

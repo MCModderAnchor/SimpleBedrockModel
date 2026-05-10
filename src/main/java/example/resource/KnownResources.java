@@ -20,6 +20,8 @@ public class KnownResources {
 
     public static final ResourceLocation TEST = registerAnimationAndModel(ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "test"));
     public static final ResourceLocation DEAGLE = registerAnimationAndModel(ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "deagle"));
+    public static final ResourceLocation POLY_MESH_TEST = registerModel(ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "vct.geo"));
+    // Molang 测试动画，复用 TEST 的模型
 
     // Molang 测试动画，复用 TEST 的模型
     public static final ResourceLocation MOLANG_TEST = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "molang_test");

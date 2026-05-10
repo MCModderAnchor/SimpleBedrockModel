@@ -31,9 +31,11 @@ public class ExampleModRegister {
     public static final String MOD_ID = "example";
 
     public static Block TEST_BLOCK;
+    public static Block POLY_MESH_TEST_BLOCK;
     public static BlockEntityType<TestBlockEntity> TEST_BLOCK_ENTITY_TYPE;
     public static EntityType<Zti> ZTI_ENTITY_TYPE;
     public static BlockItem TEST_BLOCK_ITEM;
+    public static BlockItem POLY_MESH_TEST_BLOCK_ITEM;
     public static Item DEAGLE_ITEM;
     public static AttachmentType<FPGunAnimationCapability> FP_GUN_ANIMATION;
 
@@ -59,11 +61,13 @@ public class ExampleModRegister {
 
         if (BuiltInRegistries.BLOCK.equals(registry)) {
             TEST_BLOCK = new TestBlock();
+            POLY_MESH_TEST_BLOCK = new TestBlock();
             event.register(BuiltInRegistries.BLOCK.key(), modLoc("test_block"), () -> TEST_BLOCK);
+            event.register(BuiltInRegistries.BLOCK.key(), modLoc("poly_mesh_test_block"), () -> POLY_MESH_TEST_BLOCK);
         }
 
         if (BuiltInRegistries.BLOCK_ENTITY_TYPE.equals(registry)) {
-            TEST_BLOCK_ENTITY_TYPE = BlockEntityType.Builder.of(TestBlockEntity::new, TEST_BLOCK).build(null);
+            TEST_BLOCK_ENTITY_TYPE = BlockEntityType.Builder.of(TestBlockEntity::new, TEST_BLOCK, POLY_MESH_TEST_BLOCK).build(null);
             event.register(BuiltInRegistries.BLOCK_ENTITY_TYPE.key(), modLoc("test_block_entity_type"), () -> TEST_BLOCK_ENTITY_TYPE);
         }
 
@@ -76,6 +80,7 @@ public class ExampleModRegister {
 
         if (BuiltInRegistries.ITEM.equals(registry)) {
             TEST_BLOCK_ITEM = new BlockItem(TEST_BLOCK, new BlockItem.Properties());
+            POLY_MESH_TEST_BLOCK_ITEM = new BlockItem(POLY_MESH_TEST_BLOCK, new BlockItem.Properties());
             DEAGLE_ITEM = new DeagleItem();
             DEFENDER_ARMOR_HELMET = new ExampleArmorItem(ArmorItem.Type.HELMET);
             DEFENDER_ARMOR_CHESTPLATE = new ExampleArmorItem(ArmorItem.Type.CHESTPLATE);
@@ -83,6 +88,7 @@ public class ExampleModRegister {
             DEFENDER_ARMOR_BOOTS = new ExampleArmorItem(ArmorItem.Type.BOOTS);
             ZTI_SPAWN_EGG = new DeferredSpawnEggItem(() -> ZTI_ENTITY_TYPE, 0x61554D, 0xD8B076, new Item.Properties());
             event.register(BuiltInRegistries.ITEM.key(), modLoc("test_block_item"), () -> TEST_BLOCK_ITEM);
+            event.register(BuiltInRegistries.ITEM.key(), modLoc("poly_mesh_test_block"), () -> POLY_MESH_TEST_BLOCK_ITEM);
             event.register(BuiltInRegistries.ITEM.key(), modLoc("deagle"), () -> DEAGLE_ITEM);
 
             event.register(BuiltInRegistries.ITEM.key(), modLoc("defender_helmet"), () -> DEFENDER_ARMOR_HELMET);
@@ -98,6 +104,7 @@ public class ExampleModRegister {
                     .icon(() -> DEAGLE_ITEM.getDefaultInstance())
                     .displayItems((parameters, output) -> {
                         output.accept(TEST_BLOCK_ITEM);
+                        output.accept(POLY_MESH_TEST_BLOCK_ITEM);
                         output.accept(DEAGLE_ITEM);
                         output.accept(DEFENDER_ARMOR_HELMET);
                         output.accept(DEFENDER_ARMOR_CHESTPLATE);

@@ -32,6 +32,10 @@ public class BonesItem {
     @ClientOnly
     private Map<String, JsonElement> locators;
 
+    @SerializedName("poly_mesh")
+    @ClientOnly
+    private PolyMeshItem polyMesh;
+
     @Nullable
     public CubesItem[] getCubes() {
         return cubes;
@@ -60,5 +64,10 @@ public class BonesItem {
     @Nullable
     public Map<String, JsonElement> getLocators() {
         return locators;
+    }
+
+    @Nullable
+    public PolyMeshItem getPolyMesh() {
+        return polyMesh;
     }
 }

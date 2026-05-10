@@ -1,6 +1,7 @@
 package example.client.render.entity;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.EntityModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.BedrockModelResourceSet;
 import com.google.common.base.Suppliers;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
@@ -51,7 +52,8 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
             poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)));
 
             VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityCutout(TEXTURE));
-            model.renderToBuffer(poseStack, consumer, packedLight,
+            VertexConsumer consumer2 = bufferSource.getBuffer(BedrockModelRenderTypes.polyMeshCutout(TEXTURE));
+            model.renderToBuffer(poseStack, consumer, consumer2, packedLight,
                     OverlayTexture.pack(0f, entity.hurtTime > 0 || entity.deathTime > 0)
             );
             model.applyPose(model.getBindPose());

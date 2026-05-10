@@ -6,6 +6,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.E
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumBedrockCubeBox;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumBedrockCubePerFace;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.*;
 import com.google.common.collect.Collections2;
@@ -143,6 +144,13 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
         return new BedrockCubePerFace(x, y, z, width, height, depth, delta, texWidth, texHeight, faces);
     }
 
+    protected BedrockMesh createPolyMesh(PolyMeshItem polyMesh, BedrockBone part, float texWidth, float texHeight) {
+        if (SodiumCompat.isSodiumInstalled()) {
+            return new SodiumBedrockPolyMesh(polyMesh, part, texWidth, texHeight);
+        }
+        return new BedrockPolyMesh(polyMesh, part, texWidth, texHeight);
+    }
+
     @OnlyIn(Dist.CLIENT)
     @ParametersAreNonnullByDefault
     public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay) {
@@ -153,6 +161,27 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
     @ParametersAreNonnullByDefault
     public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
         root.render(poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha);
+    }
+
+    /**
+     * 同时渲染poly_mesh和cube的入口
+     * @param poseStack
+     * @param quadConsumer
+     * @param triangleConsumer 用于渲染mesh。需要VertexFormat.Mode为TRIANGLES，参见{@link BedrockModelRenderTypes}
+     * @param packedLight
+     * @param packedOverlay
+     */
+    @OnlyIn(Dist.CLIENT)
+    @ParametersAreNonnullByDefault
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer, int packedLight, int packedOverlay) {
+        root.render(poseStack, quadConsumer, triangleConsumer, packedLight, packedOverlay);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    @ParametersAreNonnullByDefault
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer, int packedLight, int packedOverlay,
+                               float red, float green, float blue, float alpha) {
+        root.render(poseStack, quadConsumer, triangleConsumer, packedLight, packedOverlay, red, green, blue, alpha);
     }
 
     public AABB getRenderBoundingBox() {
@@ -222,6 +251,12 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
             }
             // 塞入 cubes
             part.setLocators(parseLocators(bone, part));
+            if (bone.getPolyMesh() != null) {
+                BedrockMesh polyMesh = createPolyMesh(bone.getPolyMesh(), part, texWidth, texHeight);
+                if (polyMesh != null) {
+                    part.meshes.add(polyMesh);
+                }
+            }
             if (bone.getCubes() != null) {
                 for (CubesItem cube : bone.getCubes()) {
                     float[] uv = cube.getUv();

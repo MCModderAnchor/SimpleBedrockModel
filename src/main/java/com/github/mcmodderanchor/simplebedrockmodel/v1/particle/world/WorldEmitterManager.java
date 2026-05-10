@@ -63,6 +63,9 @@ public class WorldEmitterManager {
         EventExecutor.EventContext eventCtx = new EventExecutor.EventContext(emitter, molang, level, pos);
         emitter.setEventContext(eventCtx);
 
+        // 触发创建事件（必须在 setEventContext 之后调用）
+        emitter.fireCreationEvents();
+
         ActiveWorldEmitter active = new ActiveWorldEmitter();
         active.emitter = emitter;
         active.molang = molang;
