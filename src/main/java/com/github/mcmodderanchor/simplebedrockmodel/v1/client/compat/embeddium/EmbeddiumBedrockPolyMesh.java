@@ -1,15 +1,17 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v1.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockPolyMesh;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.PolyMeshItem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import me.jellysquid.mods.sodium.client.render.vertex.VertexConsumerUtils;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
+import org.embeddedt.embeddium.api.vertex.buffer.VertexBufferWriter;
+import org.embeddedt.embeddium.impl.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
-public class SodiumBedrockPolyMesh extends BedrockPolyMesh implements ISodiumVertexWriter {
-    public SodiumBedrockPolyMesh(PolyMeshItem polyMesh, BedrockBone part, float texWidth, float texHeight) {
+public class EmbeddiumBedrockPolyMesh extends BedrockPolyMesh implements IEmbeddiumVertexWriter {
+    public EmbeddiumBedrockPolyMesh(PolyMeshItem polyMesh, BedrockBone part, float texWidth, float texHeight) {
         super(polyMesh, part, texWidth, texHeight);
     }
 
@@ -28,7 +30,7 @@ public class SodiumBedrockPolyMesh extends BedrockPolyMesh implements ISodiumVer
         int vertexCount = 0;
         long ptr = SCRATCH_BUFFER;
         for (Triangle triangle : triangles) {
-            for (Vertex vertex : triangle.vertices) {
+            for (Vertex vertex : triangle.vertices()) {
                 if (vertexCount == SIZE) {
                     flush(writer, vertexCount);
                     vertexCount = 0;

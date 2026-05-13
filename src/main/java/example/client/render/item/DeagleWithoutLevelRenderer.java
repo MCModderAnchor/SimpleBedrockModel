@@ -3,7 +3,6 @@ package example.client.render.item;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.animation.IFPAnimationInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.handler.FirstPersonRenderHandler;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.AbstractGeoItemRenderer;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.AbstractGeoItemRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.ParticleEffectData;
@@ -27,6 +26,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -44,6 +44,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import org.apache.commons.lang3.tuple.Pair;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
@@ -55,7 +57,7 @@ import java.util.List;
 import java.util.Map;
 
 @EventBusSubscriber(value = Dist.CLIENT)
-public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockModel> { {
+public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockModel> {
     private static final Material MATERIAL = new Material(TextureAtlas.LOCATION_BLOCKS, KnownResources.DEAGLE.withPrefix("item/"));
     private static final Map<ParticleEmitterInstance, String> EMITTER_LOCATOR_MAP = new HashMap<>();
 
@@ -148,12 +150,10 @@ public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockM
         private Pose computePose() {
             Player player = Minecraft.getInstance().player;
             if (player != null) {
-                var cap = player.getCapability(ModCapability.FPGUN_ANIMATION_CAPABILITY).orElse(null);
-                if (cap != null) {
-                    GunAnimationGraph graph = cap.getAnimationInstance().getAnimationGraph();
-                    if (graph != null) {
-                        return graph.getPose();
-                    }
+                var cap = FPGunAnimationCapability.get(player);
+                GunAnimationGraph graph = cap.getAnimationInstance().getAnimationGraph();
+                if (graph != null) {
+                    return graph.getPose();
                 }
             }
             return model.getBindPose();
@@ -242,7 +242,7 @@ public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockM
         }
 
         // 构建模型空间到世界对齐空间的变换矩阵（包含 Bob + 手持位移）
-        float partialTick = mc.getPartialTick();
+        float partialTick = mc.getTimer().getGameTimeDeltaPartialTick(true);
         Matrix4f modelTransform = new Matrix4f();
         if (mc.options.bobView().get() && mc.getCameraEntity() instanceof Player player2) {
             float f = player2.walkDist - player2.walkDistO;
@@ -328,14 +328,14 @@ public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockM
                 Matrix4f globalTransform = leftHandBone.getGlobalTransform();
                 poseStack.pushPose();
                 poseStack.last().pose().mul(globalTransform);
-                playerRenderer.renderLeftHand(poseStack, event.getMultiBufferSource(), event.getPackedLight(), abstractClientPlayer);
+                playerRenderer.renderLeftHand(poseStack, bufferSource, light, abstractClientPlayer);
                 poseStack.popPose();
             }
             if (rightHandBone != null) {
                 Matrix4f globalTransform = rightHandBone.getGlobalTransform();
                 poseStack.pushPose();
                 poseStack.last().pose().mul(globalTransform);
-                playerRenderer.renderRightHand(poseStack, event.getMultiBufferSource(), event.getPackedLight(), abstractClientPlayer);
+                playerRenderer.renderRightHand(poseStack, bufferSource, light, abstractClientPlayer);
                 poseStack.popPose();
             }
         }

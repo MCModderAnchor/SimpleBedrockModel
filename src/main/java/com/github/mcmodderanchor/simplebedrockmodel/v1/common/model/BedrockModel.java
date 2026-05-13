@@ -2,9 +2,11 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.common.model;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumBedrockCubeBox;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumBedrockCubePerFace;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumBedrockPolyMesh;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumCompat;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumBedrockCubeBox;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumBedrockCubePerFace;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumBedrockPolyMesh;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
@@ -147,6 +149,9 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
     protected BedrockMesh createPolyMesh(PolyMeshItem polyMesh, BedrockBone part, float texWidth, float texHeight) {
         if (SodiumCompat.isSodiumInstalled()) {
             return new SodiumBedrockPolyMesh(polyMesh, part, texWidth, texHeight);
+        }
+        if (EmbeddiumCompat.isEmbeddiumInstalled()) {
+            return new EmbeddiumBedrockPolyMesh(polyMesh, part, texWidth, texHeight);
         }
         return new BedrockPolyMesh(polyMesh, part, texWidth, texHeight);
     }

@@ -1,20 +1,20 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium;
+package com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.ParticleVertex;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
+import org.embeddedt.embeddium.api.vertex.buffer.VertexBufferWriter;
+import org.embeddedt.embeddium.api.vertex.format.common.ParticleVertex;
+import org.embeddedt.embeddium.impl.render.vertex.VertexConsumerUtils;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 /**
- * Sodium/Embeddium 粒子顶点快速写入路径，测试
+ * Embeddium 粒子顶点快速写入路径。
  */
-public final class SodiumParticleVertexWriter {
+public final class EmbeddiumParticleVertexWriter {
     private static final int PARTICLE_VERTEX_COUNT = 4;
     private static final long PARTICLE_SCRATCH_BUFFER = MemoryUtil.nmemAlignedAlloc(64, (long) PARTICLE_VERTEX_COUNT * ParticleVertex.STRIDE);
 
-    private SodiumParticleVertexWriter() {}
+    private EmbeddiumParticleVertexWriter() {}
 
     public static boolean tryRender(VertexConsumer consumer,
                                     float x0, float y0, float z0, float u0, float v0,

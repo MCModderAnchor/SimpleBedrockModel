@@ -238,7 +238,12 @@ public class BedrockPolyMesh implements BedrockMesh {
     }
 
     private void emit(VertexConsumer consumer, TransformedVertex vertex, float red, float green, float blue, float alpha, int overlay, int lightmap) {
-        consumer.vertex(vertex.x, vertex.y, vertex.z, red, green, blue, alpha, vertex.u, vertex.v, overlay, lightmap, vertex.nx, vertex.ny, vertex.nz);
+        consumer.addVertex(vertex.x, vertex.y, vertex.z)
+                .setColor(red, green, blue, alpha)
+                .setUv(vertex.u, vertex.v)
+                .setOverlay(overlay)
+                .setLight(lightmap)
+                .setNormal(vertex.nx, vertex.ny, vertex.nz);
     }
 
     @Override
@@ -287,6 +292,10 @@ public class BedrockPolyMesh implements BedrockMesh {
 
         private Triangle(Vertex a, Vertex b, Vertex c) {
             this.vertices = new Vertex[]{a, b, c};
+        }
+
+        public Vertex[] vertices() {
+            return vertices;
         }
     }
 

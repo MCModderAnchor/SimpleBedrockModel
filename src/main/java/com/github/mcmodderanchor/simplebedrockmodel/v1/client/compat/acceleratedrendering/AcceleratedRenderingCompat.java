@@ -3,9 +3,9 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.accelerate
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.fml.ModList;
 
 @OnlyIn(Dist.CLIENT)
 public final class AcceleratedRenderingCompat {

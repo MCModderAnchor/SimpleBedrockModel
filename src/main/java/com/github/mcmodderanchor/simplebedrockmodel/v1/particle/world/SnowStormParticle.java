@@ -4,6 +4,8 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleDes
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleEffectDefinition;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.*;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.motion.*;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumCompat;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumParticleVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumParticleVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
@@ -305,7 +307,15 @@ public class SnowStormParticle extends TextureSheetParticle {
                 rCol, gCol, bCol, alpha, light)) {
             return;
         }
-
+        if (EmbeddiumCompat.isEmbeddiumInstalled() && EmbeddiumParticleVertexWriter.tryRender(
+                buffer,
+                x0, y0, z0, u0, v1,
+                x1, y1, z1, u0, v0,
+                x2, y2, z2, u1, v0,
+                x3, y3, z3, u1, v1,
+                rCol, gCol, bCol, alpha, light)) {
+            return;
+        }
 
         renderVertex(buffer, x0, y0, z0, u0, v1, light);
         renderVertex(buffer, x1, y1, z1, u0, v0, light);
