@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-@Mod.EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
 public class DeagleAnimationGraph implements GunAnimationGraph {
     private static final EulerAdditiveBlender EULER_ADDITIVE_BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 

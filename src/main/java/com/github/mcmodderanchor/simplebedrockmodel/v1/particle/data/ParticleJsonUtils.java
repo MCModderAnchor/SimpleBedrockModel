@@ -151,6 +151,6 @@ public final class ParticleJsonUtils {
             path = path + ".png";
         }
 
-        return new ResourceLocation(namespace, path);
+        return ResourceLocation.fromNamespaceAndPath(namespace, path);
     }
 }

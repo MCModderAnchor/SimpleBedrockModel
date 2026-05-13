@@ -98,14 +98,12 @@ public class DeagleWithoutLevelRenderer extends BlockEntityWithoutLevelRenderer 
         DeagleAnimationGraph deagleGraph = null;
         // 从 AnimationInstance 中获取 AnimationGraph，然后计算当前帧的 Pose，然后混合并 apply
         if (mc.getCameraEntity() instanceof Player player) {
-            player.getCapability(ModCapability.FPGUN_ANIMATION_CAPABILITY).ifPresent(capability -> {
-                GunAnimationGraph animationGraph = capability.getAnimationInstance().getAnimationGraph();
-                if (animationGraph != null) {
-                    model.applyPose(animationGraph.getPose());
-                }
-            });
-            var cap = player.getCapability(ModCapability.FPGUN_ANIMATION_CAPABILITY).orElse(null);
-            if (cap != null && cap.getAnimationInstance().getAnimationGraph() instanceof DeagleAnimationGraph dag) {
+            var capability = FPGunAnimationCapability.get(player);
+            GunAnimationGraph animationGraph = capability.getAnimationInstance().getAnimationGraph();
+            if (animationGraph != null) {
+                model.applyPose(animationGraph.getPose());
+            }
+            if (animationGraph instanceof DeagleAnimationGraph dag) {
                 deagleGraph = dag;
             }
         }
@@ -181,19 +179,19 @@ public class DeagleWithoutLevelRenderer extends BlockEntityWithoutLevelRenderer 
         if (mc.getCameraEntity() instanceof AbstractClientPlayer abstractClientPlayer) {
             BedrockBone leftHandBone = model.getBone("lefthand_pos");
             BedrockBone rightHandBone = model.getBone("righthand_pos");
-            RenderSystem.setShaderTexture(0, abstractClientPlayer.getSkinTextureLocation());
+            RenderSystem.setShaderTexture(0, abstractClientPlayer.getSkin().texture());
             PlayerRenderer playerRenderer = (PlayerRenderer) mc.getEntityRenderDispatcher().getRenderer(abstractClientPlayer);
             if (leftHandBone != null) {
                 Matrix4f globalTransform = leftHandBone.getGlobalTransform();
                 poseStack.pushPose();
-                poseStack.mulPoseMatrix(globalTransform);
+                poseStack.last().pose().mul(globalTransform);
                 playerRenderer.renderLeftHand(poseStack, event.getMultiBufferSource(), event.getPackedLight(), abstractClientPlayer);
                 poseStack.popPose();
             }
             if (rightHandBone != null) {
                 Matrix4f globalTransform = rightHandBone.getGlobalTransform();
                 poseStack.pushPose();
-                poseStack.mulPoseMatrix(globalTransform);
+                poseStack.last().pose().mul(globalTransform);
                 playerRenderer.renderRightHand(poseStack, event.getMultiBufferSource(), event.getPackedLight(), abstractClientPlayer);
                 poseStack.popPose();
             }

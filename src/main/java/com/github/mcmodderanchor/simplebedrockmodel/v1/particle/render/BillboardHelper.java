@@ -7,8 +7,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -120,13 +120,12 @@ public final class BillboardHelper {
                                 float x, float y, float z,
                                 float u, float v,
                                 ParticleInstance particle, int light) {
-        consumer.vertex(pose, x, y, z)
-                .color(particle.r, particle.g, particle.b, particle.a)
-                .uv(u, v)
-                .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(LightTexture.FULL_BRIGHT)
-                .normal(normal, 0, 1, 0)
-                .endVertex();
+        consumer.addVertex(pose, x, y, z)
+                .setColor(particle.r, particle.g, particle.b, particle.a)
+                .setUv(u, v)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(LightTexture.FULL_BRIGHT)
+                .setNormal(0, 1, 0);
     }
 
     /**

@@ -3,6 +3,7 @@ package example.resource;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelEvent;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.MochaEngine;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoaders;
 import example.animation.MolangTestAnimationContext;
 import example.init.ExampleModRegister;
@@ -21,7 +22,7 @@ public class KnownResources {
     public static final ResourceLocation DEAGLE = registerAnimationAndModel(ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "deagle"));
 
     // Molang 测试动画，复用 TEST 的模型
-    public static final ResourceLocation MOLANG_TEST = new ResourceLocation(ExampleModRegister.MOD_ID, "molang_test");
+    public static final ResourceLocation MOLANG_TEST = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "molang_test");
 
     private static ResourceLocation registerAnimationAndModel(ResourceLocation location) {
         ANIMATION_AND_MODEL.add(location);

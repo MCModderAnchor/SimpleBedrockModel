@@ -27,7 +27,7 @@ public class ParticleEffectKeyframesSerializer implements JsonDeserializer<Parti
                     continue;
                 }
                 JsonObject object = value.getAsJsonObject();
-                ResourceLocation effect = new ResourceLocation(GsonHelper.getAsString(object, "effect"));
+                ResourceLocation effect = ResourceLocation.parse(GsonHelper.getAsString(object, "effect"));
                 String locator = GsonHelper.getAsString(object, "locator", "");
                 String preEffectScript = GsonHelper.getAsString(object, "pre_effect_script", "");
                 keyframes.put(time, new ParticleEffectData(effect, locator, preEffectScript));

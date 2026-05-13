@@ -11,8 +11,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +53,7 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
     }
 
     @Override
-    public void begin(BufferBuilder builder, TextureManager textureManager) {
+    public @Nullable BufferBuilder begin(Tesselator tesselator, TextureManager textureManager) {
         RenderSystem.enableDepthTest();
         Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
         RenderSystem.setShaderTexture(0, texture);
@@ -80,12 +81,7 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
         }
 
         RenderSystem.disableCull();
-        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
-    }
-
-    @Override
-    public void end(Tesselator tesselator) {
-        tesselator.end();
+        return tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
     }
 
     @Override

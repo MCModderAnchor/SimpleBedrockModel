@@ -62,7 +62,7 @@ public class ParticleDefinitionLoader extends SimplePreparableReloadListener<Map
                         JsonElement json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
                         String path = location.getPath();
                         String name = path.substring(DIRECTORY.length() + 1, path.length() - 5);
-                        ResourceLocation id = new ResourceLocation(location.getNamespace(), name);
+                        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(location.getNamespace(), name);
                         result.put(id, json);
                     } catch (IOException e) {
                         SimpleBedrockModel.LOGGER.error("Failed to read particle definition: {}", location, e);

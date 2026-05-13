@@ -51,11 +51,11 @@ public class ParticleEffectDeserializer {
 
     private ParticleDescription parseDescription(JsonObject obj) {
         String id = obj.get("identifier").getAsString();
-        ResourceLocation identifier = new ResourceLocation(id);
+        ResourceLocation identifier = ResourceLocation.parse(id);
 
         JsonObject renderParams = obj.getAsJsonObject("basic_render_parameters");
         ParticleDescription.Material material = ParticleDescription.Material.PARTICLES_BLEND;
-        ResourceLocation texture = new ResourceLocation("minecraft", "textures/particle/generic_0.png");
+        ResourceLocation texture = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/particle/generic_0.png");
         int texW = 0, texH = 0;
 
         if (renderParams != null) {

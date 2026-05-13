@@ -18,13 +18,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import org.joml.Quaternionf;
-import org.joml.Quaternionfc;
-import org.joml.Vector3f;
-import org.joml.Vector3fc;
+import org.joml.*;
 
 import org.jetbrains.annotations.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.lang.Math;
 import java.util.*;
 
 public class BedrockModel implements Skeleton, BoneIndexProvider {

@@ -12,9 +12,9 @@ import com.maydaymemory.mae.control.runner.AnimationContext;
 import com.maydaymemory.mae.control.runner.AnimationRunner;
 import com.maydaymemory.mae.control.runner.LoopingState;
 import example.resource.KnownResources;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -23,7 +23,7 @@ import java.util.List;
  * Molang 动画测试用上下文。
  * 使用 AnimationRunner 驱动含 Molang 表达式的动画，更接近实际使用场景。
  */
-@Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class MolangTestAnimationContext {
     private static final MolangContext<Object> SHARED_CONTEXT = new MolangContext<>();
     private static final MochaEngine<?> SHARED_ENGINE = MolangEngineHelper.createEngine(SHARED_CONTEXT);
