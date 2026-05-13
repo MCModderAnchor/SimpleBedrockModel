@@ -50,6 +50,8 @@ public class BedrockBone {
     public boolean illuminated = false;
     public boolean mirror;
     private Map<String, LocatorData> locators = Map.of();
+    private boolean hasCubesInTree;
+    private boolean hasMeshesInTree;
     @OnlyIn(Dist.CLIENT)
     private transient AcceleratedBedrockBoneCache acceleratedCache;
 
@@ -60,70 +62,80 @@ public class BedrockBone {
 
     @OnlyIn(Dist.CLIENT)
     public void render(PoseStack poseStack, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha) {
-        int cubePackedLight = illuminated ?  ClientConstants.MAX_LIGHT_TEXTURE : lightmap;
-        if (this.visible) {
-            // 缩放过小时，直接退出渲染
-            boolean xNearZero = -1E-5F < xScale && xScale < 1E-5F;
-            boolean yNearZero = -1E-5F < yScale && yScale < 1E-5F;
-            boolean zNearZero = -1E-5F < zScale && zScale < 1E-5F;
-            if ((xNearZero && yNearZero) || (xNearZero && zNearZero) || (yNearZero && zNearZero)) {
-                return;
-            }
-
-            if (!this.cubes.isEmpty() || !this.children.isEmpty()) {
-                poseStack.pushPose();
-                this.translateAndRotateAndScale(poseStack);
-                PoseStack.Pose pose = poseStack.last();
-                if (!AcceleratedRenderingCompat.renderCubes(this, getAcceleratedCache(), pose, consumer, cubePackedLight, overlay, red, green, blue, alpha)) {
-                    this.compile(pose, consumer, cubePackedLight, overlay, red, green, blue, alpha);
-                }
-
-                for (BedrockBone part : this.children) {
-                    part.render(poseStack, consumer, cubePackedLight, overlay, red, green, blue, alpha);
-                }
-
-                poseStack.popPose();
-            }
-        }
+        this.renderGeometryPass(poseStack, consumer, lightmap, overlay, red, green, blue, alpha, false);
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void render(PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer, int lightmap, int overlay) {
-        this.render(poseStack, quadConsumer, triangleConsumer, lightmap, overlay, 1.0F, 1.0F, 1.0F, 1.0F);
+    public void renderCubes(PoseStack poseStack, VertexConsumer quadConsumer, int lightmap, int overlay,
+                            float red, float green, float blue, float alpha) {
+        this.renderGeometryPass(poseStack, quadConsumer, lightmap, overlay, red, green, blue, alpha, false);
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void render(PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer, int lightmap, int overlay,
-                       float red, float green, float blue, float alpha) {
-        int cubePackedLight = illuminated ? ClientConstants.MAX_LIGHT_TEXTURE : lightmap;
-        if (this.visible) {
-            // 缩放过小时，直接退出渲染
-            boolean xNearZero = -1E-5F < xScale && xScale < 1E-5F;
-            boolean yNearZero = -1E-5F < yScale && yScale < 1E-5F;
-            boolean zNearZero = -1E-5F < zScale && zScale < 1E-5F;
-            if ((xNearZero && yNearZero) || (xNearZero && zNearZero) || (yNearZero && zNearZero)) {
-                return;
+    public void renderMeshes(PoseStack poseStack, VertexConsumer triangleConsumer, int lightmap, int overlay,
+                             float red, float green, float blue, float alpha) {
+        this.renderGeometryPass(poseStack, triangleConsumer, lightmap, overlay, red, green, blue, alpha, true);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    private void renderGeometryPass(PoseStack poseStack, VertexConsumer consumer, int lightmap, int overlay,
+                                    float red, float green, float blue, float alpha, boolean meshesPass) {
+        if (!this.hasGeometryInTree(meshesPass)) {
+            return;
+        }
+        if (!this.visible || isScaleTooSmallToRender()) {
+            return;
+        }
+
+        int packedLight = illuminated ? ClientConstants.MAX_LIGHT_TEXTURE : lightmap;
+        poseStack.pushPose();
+        this.translateAndRotateAndScale(poseStack);
+        PoseStack.Pose pose = poseStack.last();
+
+        if (meshesPass) {
+            if (!this.meshes.isEmpty() && !AcceleratedRenderingCompat.renderMeshes(this, getAcceleratedCache(), pose, consumer, packedLight, overlay, red, green, blue, alpha)) {
+                this.compileMeshes(pose, consumer, packedLight, overlay, red, green, blue, alpha);
             }
+        } else if (!this.cubes.isEmpty() && !AcceleratedRenderingCompat.renderCubes(this, getAcceleratedCache(), pose, consumer, packedLight, overlay, red, green, blue, alpha)) {
+            this.compile(pose, consumer, packedLight, overlay, red, green, blue, alpha);
+        }
 
-            if (!this.cubes.isEmpty() || !this.meshes.isEmpty() || !this.children.isEmpty()) {
-                poseStack.pushPose();
-                this.translateAndRotateAndScale(poseStack);
-                PoseStack.Pose pose = poseStack.last();
-                AcceleratedBedrockBoneCache cache = getAcceleratedCache();
-                if (!AcceleratedRenderingCompat.renderCubes(this, cache, pose, quadConsumer, cubePackedLight, overlay, red, green, blue, alpha)) {
-                    this.compile(pose, quadConsumer, cubePackedLight, overlay, red, green, blue, alpha);
-                }
-                if (!AcceleratedRenderingCompat.renderMeshes(this, cache, pose, triangleConsumer, cubePackedLight, overlay, red, green, blue, alpha)) {
-                    this.compileMeshes(pose, triangleConsumer, cubePackedLight, overlay, red, green, blue, alpha);
-                }
-
-                for (BedrockBone part : this.children) {
-                    part.render(poseStack, quadConsumer, triangleConsumer, cubePackedLight, overlay, red, green, blue, alpha);
-                }
-
-                poseStack.popPose();
+        for (BedrockBone child : this.children) {
+            if (child.hasGeometryInTree(meshesPass)) {
+                child.renderGeometryPass(poseStack, consumer, packedLight, overlay, red, green, blue, alpha, meshesPass);
             }
         }
+
+        poseStack.popPose();
+    }
+
+    private boolean isScaleTooSmallToRender() {
+        boolean xNearZero = -1E-5F < xScale && xScale < 1E-5F;
+        boolean yNearZero = -1E-5F < yScale && yScale < 1E-5F;
+        boolean zNearZero = -1E-5F < zScale && zScale < 1E-5F;
+        return (xNearZero && yNearZero) || (xNearZero && zNearZero) || (yNearZero && zNearZero);
+    }
+
+    public void updateGeometryFlags() {
+        this.hasCubesInTree = !this.cubes.isEmpty();
+        this.hasMeshesInTree = !this.meshes.isEmpty();
+        for (BedrockBone child : this.children) {
+            child.updateGeometryFlags();
+            this.hasCubesInTree |= child.hasCubesInTree();
+            this.hasMeshesInTree |= child.hasMeshesInTree();
+        }
+    }
+
+    private boolean hasGeometryInTree(boolean meshesPass) {
+        return meshesPass ? hasMeshesInTree : hasCubesInTree;
+    }
+
+    public boolean hasCubesInTree() {
+        return hasCubesInTree;
+    }
+
+    public boolean hasMeshesInTree() {
+        return hasMeshesInTree;
     }
 
     public void translateAndRotateAndScale(PoseStack poseStack) {

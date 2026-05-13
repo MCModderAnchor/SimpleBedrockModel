@@ -18,6 +18,8 @@ import com.google.gson.JsonObject;
 import com.maydaymemory.mae.basic.*;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -169,24 +171,35 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
     }
 
     /**
-     * 同时渲染poly_mesh和cube的入口
+     * 先后渲染 cube 和 poly_mesh
+     *
      * @param poseStack
-     * @param quadConsumer
-     * @param triangleConsumer 用于渲染mesh。需要VertexFormat.Mode为TRIANGLES，参见{@link BedrockModelRenderTypes}
+     * @param bufferSource
+     * @param quadRenderType 用于渲染 cube 的 RenderType
+     * @param triangleRenderType 用于渲染 mesh。需要 VertexFormat.Mode 为 TRIANGLES，参见 {@link BedrockModelRenderTypes}
      * @param packedLight
      * @param packedOverlay
      */
     @OnlyIn(Dist.CLIENT)
     @ParametersAreNonnullByDefault
-    public void renderToBuffer(PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer, int packedLight, int packedOverlay) {
-        root.render(poseStack, quadConsumer, triangleConsumer, packedLight, packedOverlay);
+    public void renderToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType, RenderType triangleRenderType,
+                               int packedLight, int packedOverlay) {
+        this.renderToBuffer(poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay,
+                1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @OnlyIn(Dist.CLIENT)
     @ParametersAreNonnullByDefault
-    public void renderToBuffer(PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer, int packedLight, int packedOverlay,
-                               float red, float green, float blue, float alpha) {
-        root.render(poseStack, quadConsumer, triangleConsumer, packedLight, packedOverlay, red, green, blue, alpha);
+    public void renderToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType, RenderType triangleRenderType,
+                               int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
+        if (root.hasCubesInTree()) {
+            VertexConsumer quadConsumer = bufferSource.getBuffer(quadRenderType);
+            root.renderCubes(poseStack, quadConsumer, packedLight, packedOverlay, red, green, blue, alpha);
+        }
+        if (root.hasMeshesInTree()) {
+            VertexConsumer triangleConsumer = bufferSource.getBuffer(triangleRenderType);
+            root.renderMeshes(poseStack, triangleConsumer, packedLight, packedOverlay, red, green, blue, alpha);
+        }
     }
 
     public AABB getRenderBoundingBox() {
@@ -320,6 +333,7 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
                 }
             }
         }
+        root.updateGeometryFlags();
         // 将所有相对 pivot 转换为绝对 pivot，使用 DFS 实现
         convertPivot(root);
     }

@@ -10,7 +10,6 @@ import com.maydaymemory.mae.basic.ZYXBoneTransformFactory;
 import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import example.entity.Zti;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -51,9 +50,10 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
 
             poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)));
 
-            VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityCutout(TEXTURE));
-            VertexConsumer consumer2 = bufferSource.getBuffer(BedrockModelRenderTypes.polyMeshCutout(TEXTURE));
-            model.renderToBuffer(poseStack, consumer, consumer2, packedLight,
+            model.renderToBuffer(poseStack, bufferSource,
+                    RenderType.entityCutout(TEXTURE),
+                    BedrockModelRenderTypes.polyMeshCutout(TEXTURE),
+                    packedLight,
                     OverlayTexture.pack(0f, entity.hurtTime > 0 || entity.deathTime > 0)
             );
             model.applyPose(model.getBindPose());

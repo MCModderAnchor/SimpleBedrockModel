@@ -21,6 +21,7 @@ public class SlotModel extends EntityModel<Entity> {
         bone.y = 8.0F;
         bone.z = 8.0F;
         bone.cubes.add(new BedrockCubePerFace(-16.0F, -16.0F, 0F, 16.0F, 16.0F, 0, 0, 16, 16, SINGLE_SOUTH_X16));
+        bone.updateGeometryFlags();
         bone.illuminated = illuminated;
     }
 
