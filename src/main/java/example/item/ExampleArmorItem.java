@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.List;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class ExampleArmorItem extends ArmorItem {
 
     public ExampleArmorItem(ArmorItem.Type type) {

@@ -25,7 +25,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.List;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class TestBlockAnimationContext implements Tickable {
     public static final CubicHermiteInterpolatorBlender blender = new CubicHermiteInterpolatorBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 

@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class DeagleItem extends Item implements GunItem {
     public DeagleItem() {
         super(new Properties().stacksTo(1));

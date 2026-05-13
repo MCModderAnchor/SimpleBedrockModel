@@ -16,7 +16,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 
 public class ReloadListenersRegister {
     @OnlyIn(Dist.CLIENT)
-    @EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT)
     public static class BedrockModelClientRegister {
         @SubscribeEvent
         public static void onRegisterReloadListener(RegisterClientReloadListenersEvent event) {
@@ -41,7 +41,7 @@ public class ReloadListenersRegister {
     }
 
     @OnlyIn(Dist.DEDICATED_SERVER)
-    @EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.DEDICATED_SERVER, bus = EventBusSubscriber.Bus.GAME)
+    @EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.DEDICATED_SERVER)
     public static class BedrockModelServerRegister {
         @SubscribeEvent
         public static void onRegisterReloadListener(AddReloadListenerEvent event) {

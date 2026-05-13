@@ -102,7 +102,7 @@ dependencies {
         exclude group: 'org.joml', module: 'joml'
     }
 
-    compileOnly "maven.modrinth:acceleratedrendering:1.0.8-1.21.1-alpha"
+    implementation "maven.modrinth:acceleratedrendering:1.0.8-1.21.1-alpha"
     runtimeOnly "curse.maven:configured-457570:7276577"
 
     // 测试用mod

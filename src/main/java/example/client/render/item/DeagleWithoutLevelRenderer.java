@@ -19,15 +19,12 @@ import com.mojang.math.Axis;
 import example.animation.DeagleAnimationGraph;
 import example.animation.GunAnimationGraph;
 import example.capability.FPGunAnimationCapability;
-import example.init.ExampleModRegister;
 import example.resource.KnownResources;
 import com.maydaymemory.mae.basic.Pose;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
@@ -43,7 +40,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joml.Matrix4f;
@@ -56,7 +52,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@EventBusSubscriber(value = Dist.CLIENT)
 public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockModel> {
     private static final Material MATERIAL = new Material(TextureAtlas.LOCATION_BLOCKS, KnownResources.DEAGLE.withPrefix("item/"));
     private static final Map<ParticleEmitterInstance, String> EMITTER_LOCATOR_MAP = new HashMap<>();
@@ -64,7 +59,7 @@ public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockM
     private static BedrockModel model;
 
     // 暂时只能想到这么丑的办法
-    @EventBusSubscriber(value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(value = Dist.CLIENT)
     public static class ModelReloadListenerRegister {
         @SubscribeEvent
         public static void onModelReloadListenerRegister(RegisterBedrockModelReloadListenerEvent event) {

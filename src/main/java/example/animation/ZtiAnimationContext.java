@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class ZtiAnimationContext implements Tickable {
     private static BedrockAnimation IDLE;
     private static BedrockAnimation RUNNING;

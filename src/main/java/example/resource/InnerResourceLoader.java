@@ -12,7 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class InnerResourceLoader {
 
     public static final ResourceLocation DEFENDER = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "defender.geo");

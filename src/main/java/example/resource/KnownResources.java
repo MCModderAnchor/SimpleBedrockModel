@@ -13,7 +13,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.ArrayList;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class KnownResources {
     public static final ArrayList<ResourceLocation> ANIMATION_AND_MODEL = new ArrayList<>();
     public static final ArrayList<ResourceLocation> MODEL = new ArrayList<>();
