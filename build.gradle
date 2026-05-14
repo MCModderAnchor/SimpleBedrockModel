@@ -14,6 +14,7 @@ plugins {
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
     id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id 'maven-publish'
 }
 
 apply plugin: 'org.spongepowered.mixin'
@@ -193,4 +194,35 @@ tasks.withType(JavaCompile).configureEach {
 java {
     // 编译源码文件，方便发布 maven
     withSourcesJar()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = project.group
+            artifactId = archivesBaseName
+            version = project.version
+
+            artifact tasks.named('jarJar')
+            artifact tasks.named('sourcesJar')
+
+            pom {
+                name = mod_name
+                description = mod_description
+                licenses {
+                    license {
+                        name = mod_license
+                    }
+                }
+            }
+        }
+    }
+}
+
+tasks.withType(PublishToMavenRepository).configureEach {
+    dependsOn tasks.named('reobfJarJar')
+}
+
+tasks.withType(PublishToMavenLocal).configureEach {
+    dependsOn tasks.named('reobfJarJar')
 }
