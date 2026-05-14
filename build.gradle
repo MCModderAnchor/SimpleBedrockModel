@@ -4,6 +4,7 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.+'
     id "com.modrinth.minotaur" version "2.8.7"
     id 'me.champeau.jmh' version '0.7.2'
+    id 'maven-publish'
 }
 
 version = mod_version
@@ -196,6 +197,28 @@ modrinth {
     gameVersions = [minecraft_version]
     loaders = ["neoforge"]
     //debugMode = true
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = project.group
+            artifactId = archivesBaseName
+            version = project.version
+
+            from components.java
+
+            pom {
+                name = mod_name
+                description = mod_description
+                licenses {
+                    license {
+                        name = mod_license
+                    }
+                }
+            }
+        }
+    }
 }
 
 tasks.register("runWithRenderDoc", Exec) {
