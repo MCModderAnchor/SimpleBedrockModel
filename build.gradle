@@ -104,6 +104,7 @@ dependencies {
     }
 
     implementation "maven.modrinth:acceleratedrendering:1.0.8-1.21.1-alpha"
+    api 'org.ow2.asm:asm:9.8'
     runtimeOnly "curse.maven:configured-457570:7276577"
 
     // 测试用mod
