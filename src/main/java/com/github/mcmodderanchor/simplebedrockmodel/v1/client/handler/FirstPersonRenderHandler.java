@@ -223,6 +223,8 @@ public class FirstPersonRenderHandler {
         IFPGeoItemRenderer renderer = optRenderer.get();
         if (event.getHand() == InteractionHand.OFF_HAND && renderer.blockOffhandRender()) {
             event.setCanceled(true);
+            event.setCanceled(true);
+            return;
         }
 
         ItemDisplayContext transformType = ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
