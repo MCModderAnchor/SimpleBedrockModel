@@ -21,7 +21,6 @@ import java.util.List;
 
 /**
  * Molang 动画测试用上下文。
- * 使用 AnimationRunner 驱动含 Molang 表达式的动画，更接近实际使用场景。
  */
 @EventBusSubscriber
 public class MolangTestAnimationContext {
@@ -32,6 +31,11 @@ public class MolangTestAnimationContext {
     private static BedrockAnimation molangTestAnimation;
     @Nullable
     private static AnimationRunner runner;
+
+    @Nullable
+    public static BedrockAnimation getAnimation() {
+        return molangTestAnimation;
+    }
 
     public static MochaEngine<?> getSharedEngine() {
         return SHARED_ENGINE;
@@ -71,13 +75,8 @@ public class MolangTestAnimationContext {
     @Nullable
     public static Pose evaluatePose() {
         if (runner != null) {
-            SHARED_CONTEXT.setAnimTime(runner.getAnimationContext().getProgressInSecond());
-            MolangContext.setCurrent(SHARED_CONTEXT);
-            try {
-                return runner.evaluate();
-            } finally {
-                MolangContext.setCurrent(null);
-            }
+            // 每次求值时传入 context，不持有长期引用
+            return runner.evaluate(SHARED_CONTEXT);
         }
         return null;
     }

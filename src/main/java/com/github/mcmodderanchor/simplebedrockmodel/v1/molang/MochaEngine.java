@@ -381,18 +381,6 @@ public interface MochaEngine<T> {
     @Contract("_ -> this")
     @NotNull MochaEngine<T> postCompile(final @Nullable Consumer<byte @NotNull []> bytecodeConsumer);
 
-    /**
-     * 强制使用解释器执行，跳过字节码编译。
-     * 当设为 true 时，{@link #compile} 方法将返回基于 AST 解释执行的包装，
-     * 而非生成字节码。
-     *
-     * <p>默认为 false（使用字节码编译）。</p>
-     *
-     * @param forceInterpreter 是否强制使用解释器
-     * @return This engine instance
-     */
-    @Contract("_ -> this")
-    @NotNull MochaEngine<T> forceInterpreter(final boolean forceInterpreter);
     //#endregion
 
     /**

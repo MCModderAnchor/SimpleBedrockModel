@@ -1,8 +1,9 @@
 package example.animation;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationReloadListenerEvent;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.time.AnimationClock;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
 import com.maydaymemory.mae.basic.Keyframe;
 import com.maydaymemory.mae.basic.Pose;
@@ -12,7 +13,6 @@ import com.maydaymemory.mae.control.Tickable;
 import com.maydaymemory.mae.control.misc.AnimationVelocityEstimatorNode;
 import com.maydaymemory.mae.control.misc.RealtimeVelocityEstimatorNode;
 import com.maydaymemory.mae.control.runner.AnimationRunner;
-import example.resource.KnownResources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -20,12 +20,9 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.List;
 
-@EventBusSubscriber
 public class TestBlockAnimationContext implements Tickable {
     public static final CubicHermiteInterpolatorBlender blender = new CubicHermiteInterpolatorBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
@@ -38,18 +35,19 @@ public class TestBlockAnimationContext implements Tickable {
     };
     private static final BedrockAnimation[] ANIMATIONS_CACHE = new BedrockAnimation[ANIMATIONS.length];
 
-    @SubscribeEvent
-    public static void onAnimationReloadListenerRegister(RegisterBedrockAnimationReloadListenerEvent event) {
-        event.register(map -> {
-            List<BedrockAnimation> animations = map.get(KnownResources.TEST);
-            for (int i = 0; i < ANIMATIONS.length; i++) {
-                String animationName = ANIMATIONS[i];
-                ANIMATIONS_CACHE[i] = animations.stream()
-                        .filter(animation -> animation.getName().equals(animationName))
-                        .findFirst()
-                        .orElseThrow();
-            }
-        });
+    /**
+     * 使用 v2 模型初始化动画，骨骼索引与烘焙后的模型一致。
+     * 替代原 v1 {@code RegisterBedrockAnimationReloadListenerEvent} 流程。
+     */
+    public static void initialize(BedrockAnimationFile animationFile, BoneIndexProvider indexProvider) {
+        List<BedrockAnimation> animations = BedrockAnimation.createAnimation(animationFile, indexProvider);
+        for (int i = 0; i < ANIMATIONS.length; i++) {
+            String animationName = ANIMATIONS[i];
+            ANIMATIONS_CACHE[i] = animations.stream()
+                    .filter(animation -> animation.getName().equals(animationName))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Missing test animation: " + animationName));
+        }
     }
 
     private final BlockEntity blockEntity;

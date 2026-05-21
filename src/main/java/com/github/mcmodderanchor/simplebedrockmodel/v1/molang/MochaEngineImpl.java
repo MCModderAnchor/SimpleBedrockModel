@@ -230,9 +230,4 @@ final class MochaEngineImpl<T> implements MochaEngine<T> {
         return this;
     }
 
-    @Override
-    public @NotNull MochaEngine<T> forceInterpreter(final boolean forceInterpreter) {
-        compiler.forceInterpreter(forceInterpreter);
-        return this;
-    }
 }

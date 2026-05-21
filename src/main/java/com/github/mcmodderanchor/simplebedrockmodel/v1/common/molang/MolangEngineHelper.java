@@ -9,27 +9,62 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.value.Muta
 
 /**
  * 创建和管理 MolangEngine 的工具类。
+ * <p>
+ * {@code query.xxx} 通过 {@link com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.QueryBinding @QueryBinding}
+ * 注解在 MolangContext 子类上声明，编译为直接方法调用。
+ * <p>
+ * 编译时可使用 {@link #createEngine(Class)}（只需类型信息），
+ * 求值时再创建带实际对象的 context 实例传入。
  */
 public final class MolangEngineHelper {
     private MolangEngineHelper() {}
 
     /**
-     * 创建一个已绑定 {@link MolangContext} 的 MochaEngine。
-     * 自动配置 math、query、variable 命名空间，返回即可用于编译和求值。
+     * 创建一个已绑定 {@link MolangContext} 实例的 MochaEngine。
+     * 编译阶段需要 entity 实例时可使用。
      *
      * @param context 要绑定的 Molang 上下文
      * @return 配置完毕的引擎
      */
     public static MochaEngine<?> createEngine(MolangContext<?> context) {
-        MochaEngine<?> engine = createEngine();
-        registerQueryBinding(engine, context.getQueryBinding());
+        MochaEngine<?> engine = MochaEngine.create(context, builder -> {
+            builder.set("math", JavaObjectBinding.of(MochaMath.class, null, new MochaMath()));
+        });
         bindContext(engine, context);
         return engine;
     }
 
     /**
+     * 根据 MolangContext 子类的类型创建 MochaEngine。
+     * 不需要实体实例 — 编译器只需类型信息来扫描 {@code @QueryBinding} 注解方法。
+     * <p>
+     * 要求 context 子类有无参构造函数。
+     * <pre>
+     * // 编译阶段（加载动画时，实体尚未创建）
+     * MochaEngine engine = MolangEngineHelper.createEngine(MolangEntityContext.class);
+     * List&lt;BedrockAnimation&gt; anims = BedrockAnimation.createAnimation(file, model, engine);
+     *
+     * // 求值阶段（实体出现后）
+     * MolangEntityContext&lt;Entity&gt; ctx = new MolangEntityContext&lt;&gt;(entity);
+     * runner.evaluate(ctx);
+     * </pre>
+     *
+     * @param contextClass MolangContext 子类
+     * @return 配置完毕的引擎
+     */
+    public static MochaEngine<?> createEngine(Class<? extends MolangContext<?>> contextClass) {
+        try {
+            MolangContext<?> ctx = contextClass.getDeclaredConstructor().newInstance();
+            return createEngine(ctx);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalArgumentException(
+                    "Cannot instantiate " + contextClass.getName() + ". Ensure it has a no-arg constructor.", e);
+        }
+    }
+
+    /**
      * 创建一个标准的 MochaEngine，预配置 math 绑定。
-     * query / variable 命名空间留空，由使用者通过 {@link #registerQueryBinding} 和 {@link #bindContext} 绑定。
+     * 不含 entity 类型信息 —— query 编译回退到 scope 路径。
      */
     public static MochaEngine<?> createEngine() {
         return MochaEngine.create(null, builder -> {
@@ -38,17 +73,7 @@ public final class MolangEngineHelper {
     }
 
     /**
-     * 将 query binding 注册到 engine scope 上。
-     * 通常在 engine 创建后、编译前调用一次，确保编译器能静态绑定 query 属性。
-     */
-    public static void registerQueryBinding(MochaEngine<?> engine, DynamicQueryBinding queryBinding) {
-        engine.scope().set("query", queryBinding);
-        engine.scope().set("q", queryBinding);
-    }
-
-    /**
-     * 在求值前调用，将 MolangContext 的 variable 存储绑定到 engine scope。
-     * 这样每个 context 的 variable 命名空间是独立的。
+     * 将 MolangContext 的 variable 存储绑定到 engine scope。
      */
     public static void bindContext(MochaEngine<?> engine, MolangContext<?> context) {
         MutableObjectBinding vars = context.getVariableStorage();
@@ -58,11 +83,7 @@ public final class MolangEngineHelper {
 
     /**
      * 编译 Molang 表达式为 {@link MolangExpression}。
-     * 编译后的表达式可以对不同 {@link MolangContext} 复用。
-     *
-     * @param engine     已配置好 scope（含 query binding 结构）的引擎
-     * @param expression Molang 表达式字符串
-     * @return 编译后的表达式
+     * 编译后的表达式可以对同类型的不同 {@link MolangContext} 实例复用。
      */
     public static MolangExpression compileExpression(MochaEngine<?> engine, String expression) {
         return engine.compile(expression, MolangExpression.class);
