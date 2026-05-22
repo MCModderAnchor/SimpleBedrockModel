@@ -1,12 +1,10 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.GsonUtil;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BedrockModelBaker;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.joml.Matrix4f;
@@ -15,9 +13,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,6 +25,19 @@ class BedrockModelBakerTest {
         assertTaczFixture("kar98", "GunFront");
         assertTaczFixture("rpg7", "group3");
         assertTaczFixture("m16a4", "mag_standard");
+    }
+
+    @Test
+    @DisplayName("preserved bone regex keeps matching bones at runtime")
+    void preservedBoneRegexKeepsMatchingBonesAtRuntime() throws IOException {
+        BedrockModelPOJO pojo = loadModel("tacz/examples/geo/kar98_geo.json");
+        Set<String> animatedBones = loadAnimatedBones("tacz/examples/anim/kar98.animation.json");
+        BakerOptions options = new BakerOptions(animatedBones, Set.of(), Set.of(Pattern.compile("Gun.*")), true, false);
+        BakedBedrockModel model = BakedBedrockModel.bake(pojo, options);
+        BedrockModelInstance instance = model.createInstance();
+
+        assertNotNull(instance.getBone("GunFront"));
+        assertNotNull(instance.getBone("Gunbody"));
     }
 
     private static void assertTaczFixture(String gunName, String foldedQueryBone) throws IOException {
@@ -64,17 +74,8 @@ class BedrockModelBakerTest {
     private static Set<String> loadAnimatedBones(String resourceName) throws IOException {
         try (InputStream stream = openResource(resourceName);
              InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-            JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
-            JsonObject animations = root.getAsJsonObject("animations");
-            Set<String> result = new LinkedHashSet<>();
-            for (Map.Entry<String, JsonElement> animationEntry : animations.entrySet()) {
-                JsonObject animation = animationEntry.getValue().getAsJsonObject();
-                JsonObject bones = animation.getAsJsonObject("bones");
-                if (bones != null) {
-                    result.addAll(bones.keySet());
-                }
-            }
-            return result;
+            BedrockAnimationFile animationFile = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockAnimationFile.class);
+            return BakerOptions.collectAnimatedBones(animationFile);
         }
     }
 

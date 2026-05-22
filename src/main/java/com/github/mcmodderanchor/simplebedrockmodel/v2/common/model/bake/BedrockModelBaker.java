@@ -22,6 +22,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class BedrockModelBaker {
     public static BakedBedrockModel bake(BedrockModelPOJO pojo, BakerOptions options) {
@@ -119,6 +120,23 @@ public class BedrockModelBaker {
         names.addAll(options.animatedBones());
         names.addAll(options.preservedBones());
         names.removeIf(name -> !compileBones.containsKey(name));
+        names.addAll(collectPatternPreservedBones(compileBones, options));
+        return names;
+    }
+
+    private static Set<String> collectPatternPreservedBones(Map<String, CompileBone> compileBones, BakerOptions options) {
+        if (options.preservedBonePatterns().isEmpty()) {
+            return Set.of();
+        }
+        Set<String> names = new LinkedHashSet<>();
+        for (String boneName : compileBones.keySet()) {
+            for (Pattern pattern : options.preservedBonePatterns()) {
+                if (pattern.matcher(boneName).matches()) {
+                    names.add(boneName);
+                    break;
+                }
+            }
+        }
         return names;
     }
 
@@ -319,6 +337,7 @@ public class BedrockModelBaker {
         Set<String> runtimeSeeds = new LinkedHashSet<>();
         runtimeSeeds.addAll(options.animatedBones());
         runtimeSeeds.addAll(options.preservedBones());
+        runtimeSeeds.addAll(collectPatternPreservedBones(compileBones, options));
         appendFoldedStats(builder, bones, runtimeBoneNames, runtimeSeeds, queryResult);
         builder.append("\nOriginal tree\n");
         builder.append("-------------\n");
