@@ -1,11 +1,21 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+// 应该用底下那个自动分配id的，不要调这个默认构造器
 public record BakedGeometryChunk(
         int attachBoneIndex,
         BakedQuadData quads,
         BakedVertexData vertices,
-        String[] sourceBones
+        String[] sourceBones,
+        int id
 ) {
+    private static final AtomicInteger NEXT_ID = new AtomicInteger();
+
+    public BakedGeometryChunk(int attachBoneIndex, BakedQuadData quads, BakedVertexData vertices, String[] sourceBones) {
+        this(attachBoneIndex, quads, vertices, sourceBones, NEXT_ID.getAndIncrement());
+    }
+
     public BakedGeometryChunk {
         quads = quads == null ? BakedQuadData.EMPTY : quads;
         vertices = vertices == null ? BakedVertexData.EMPTY : vertices;
