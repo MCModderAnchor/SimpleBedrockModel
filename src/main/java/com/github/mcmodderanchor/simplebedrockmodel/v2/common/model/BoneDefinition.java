@@ -20,7 +20,9 @@ public record BoneDefinition(
         Vector3f bindEulerRotation,
         float bindXScale,
         float bindYScale,
-        float bindZScale
+        float bindZScale,
+        boolean hasQuadsInTree,
+        boolean hasVerticesInTree
 ) {
     public BoneDefinition {
         bindLocalTransform = bindLocalTransform == null ? null : new Matrix4f(bindLocalTransform);

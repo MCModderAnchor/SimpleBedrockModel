@@ -126,7 +126,7 @@ dependencies {
 //        jarJar.ranged(it, "[3.30.2-GA,)")
 //    }
 
-    implementation fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
+    compileOnly fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
     runtimeOnly fg.deobf("curse.maven:configured-457570:5180900")
 
     // 测试用mod
@@ -135,7 +135,7 @@ dependencies {
 //    runtimeOnly fg.deobf("curse.maven:timeless-and-classics-zero-1028108:8055552-sources-8055584")
 //
 //    runtimeOnly fg.deobf("dev.kosmx.player-anim:player-animation-lib-forge:1.0.2-rc1+1.20")
-    runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
+//    runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
 //    runtimeOnly fg.deobf("curse.maven:accelerated-rendering-1314021:7342975")
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'

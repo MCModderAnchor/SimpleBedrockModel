@@ -44,6 +44,8 @@ public class BedrockModelBaker {
         QueryResult queryResult = createQueryTransforms(source.bones, compileBones, runtimeIndex);
         BedrockGeometryBaker.BakeResult bakeResult = BedrockGeometryBaker.bake(source.bones, compileBones, runtimeIndex, source.texWidth, source.texHeight, options);
 
+        boneDefinitions = applySubtreeGeometryFlags(boneDefinitions, bakeResult.chunks(), runtimeIndex);
+
         if (options.debugFoldedTree()) {
             SimpleBedrockModel.LOGGER.info("\n{}", describeFoldedTree(source.bones, compileBones, runtimeBoneNames, queryResult, options));
         }
@@ -168,9 +170,54 @@ public class BedrockModelBaker {
             int[] childArray = children.get(bone.runtimeIndex).stream().mapToInt(Integer::intValue).toArray();
             result[bone.runtimeIndex] = new BoneDefinition(bone.name, bone.runtimeIndex, parentIndex, childArray,
                     bone.pivotX, bone.pivotY, bone.pivotZ, bindLocalTransform, bindLocalNormalTransform,
-                    bone.bindRotation, bone.bindEulerRotation, 1, 1, 1);
+                    bone.bindRotation, bone.bindEulerRotation, 1, 1, 1, false, false);
         }
         return result;
+    }
+
+    private static BoneDefinition[] applySubtreeGeometryFlags(BoneDefinition[] definitions, BakedGeometryChunk[] chunks, RuntimeIndex runtimeIndex) {
+        boolean[] selfQuads = new boolean[definitions.length];
+        boolean[] selfVertices = new boolean[definitions.length];
+        for (BakedGeometryChunk chunk : chunks) {
+            int boneIndex = chunk.attachBoneIndex();
+            if (boneIndex < 0 || boneIndex >= definitions.length) continue;
+            if (chunk.hasQuads()) selfQuads[boneIndex] = true;
+            if (chunk.hasVertices()) selfVertices[boneIndex] = true;
+        }
+        boolean[] hasQuadsInTree = new boolean[definitions.length];
+        boolean[] hasVerticesInTree = new boolean[definitions.length];
+        boolean[] visited = new boolean[definitions.length];
+        for (int i = 0; i < definitions.length; i++) {
+            if (definitions[i].parentIndex() < 0) {
+                computeSubtreeGeometryFlags(definitions, i, selfQuads, selfVertices, hasQuadsInTree, hasVerticesInTree, visited);
+            }
+        }
+        BoneDefinition[] result = new BoneDefinition[definitions.length];
+        for (int i = 0; i < definitions.length; i++) {
+            BoneDefinition def = definitions[i];
+            result[i] = new BoneDefinition(def.name(), def.index(), def.parentIndex(), def.children(),
+                    def.pivotX(), def.pivotY(), def.pivotZ(), def.bindLocalTransform(), def.bindLocalNormalTransform(),
+                    def.bindRotation(), def.bindEulerRotation(), def.bindXScale(), def.bindYScale(), def.bindZScale(),
+                    hasQuadsInTree[i], hasVerticesInTree[i]);
+        }
+        return result;
+    }
+
+    private static void computeSubtreeGeometryFlags(BoneDefinition[] definitions, int boneIndex,
+                                                    boolean[] selfQuads, boolean[] selfVertices,
+                                                    boolean[] hasQuadsInTree, boolean[] hasVerticesInTree,
+                                                    boolean[] visited) {
+        if (visited[boneIndex]) return;
+        visited[boneIndex] = true;
+        boolean q = selfQuads[boneIndex];
+        boolean v = selfVertices[boneIndex];
+        for (int childIndex : definitions[boneIndex].children()) {
+            computeSubtreeGeometryFlags(definitions, childIndex, selfQuads, selfVertices, hasQuadsInTree, hasVerticesInTree, visited);
+            q |= hasQuadsInTree[childIndex];
+            v |= hasVerticesInTree[childIndex];
+        }
+        hasQuadsInTree[boneIndex] = q;
+        hasVerticesInTree[boneIndex] = v;
     }
 
     private static int runtimeParentIndex(CompileBone bone) {
