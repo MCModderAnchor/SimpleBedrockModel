@@ -19,16 +19,12 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-
 import java.util.Map;
 import java.util.function.Consumer;
 
 @OnlyIn(Dist.CLIENT)
 public final class AcceleratedRenderer {
     private final IAcceleratedRenderer<RenderContext> cachedMeshRenderer = this::renderCachedMesh;
-    private final Int2ObjectMap<AcceleratedBedrockGeometryCache> cacheByChunk = new Int2ObjectOpenHashMap<>();
 
     public boolean renderQuads(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
                                int lightmap, int overlay, float red, float green, float blue, float alpha) {
@@ -53,7 +49,7 @@ public final class AcceleratedRenderer {
             return false;
         }
 
-        AcceleratedBedrockGeometryCache cache = getCache(chunk);
+        AcceleratedBedrockGeometryCache cache = chunk.getOrCreateCache();
         Map<IBufferGraph, IMesh> meshCache = quads ? cache.quadMeshes : cache.triangleMeshes;
         int color = packColor(red, green, blue, alpha);
         RenderContext context = new RenderContext(meshCache, builder -> {
@@ -121,16 +117,6 @@ public final class AcceleratedRenderer {
         } catch (Throwable ignored) {
             return null;
         }
-    }
-
-    private AcceleratedBedrockGeometryCache getCache(BakedGeometryChunk chunk) {
-        int id = chunk.id();
-        AcceleratedBedrockGeometryCache cache = cacheByChunk.get(id);
-        if (cache == null) {
-            cache = new AcceleratedBedrockGeometryCache();
-            cacheByChunk.put(id, cache);
-        }
-        return cache;
     }
 
     private boolean canRender(IAcceleratedVertexConsumer extension) {

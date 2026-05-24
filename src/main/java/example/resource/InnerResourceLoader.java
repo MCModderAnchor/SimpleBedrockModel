@@ -9,10 +9,11 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoade
 import example.client.render.entity.ZtiRenderer;
 import example.init.ExampleModRegister;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
+@Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class InnerResourceLoader {
 
     public static final ResourceLocation DEFENDER = new ResourceLocation(ExampleModRegister.MOD_ID, "defender.geo");

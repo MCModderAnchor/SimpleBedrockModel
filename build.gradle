@@ -111,7 +111,7 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    runtimeOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
+//    runtimeOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
     compileOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
     jarJar minecraftLibrary("com.maydaymemory:mae:1.1.2") {
         jarJar.ranged(it, "[1.1.2,)")
@@ -126,7 +126,7 @@ dependencies {
 //        jarJar.ranged(it, "[3.30.2-GA,)")
 //    }
 
-    implementation fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
+    compileOnly fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
     runtimeOnly fg.deobf("curse.maven:configured-457570:5180900")
 
     // 测试用mod

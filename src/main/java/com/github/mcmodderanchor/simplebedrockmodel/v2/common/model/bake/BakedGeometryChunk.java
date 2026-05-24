@@ -1,25 +1,49 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.acceleratedrendering.AcceleratedBedrockGeometryCache;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import org.jetbrains.annotations.ApiStatus;
 
-// 应该用底下那个自动分配id的，不要调这个默认构造器
-public record BakedGeometryChunk(
-        int attachBoneIndex,
-        BakedQuadData quads,
-        BakedVertexData vertices,
-        String[] sourceBones,
-        int id
-) {
-    private static final AtomicInteger NEXT_ID = new AtomicInteger();
+public final class BakedGeometryChunk {
+    private final int attachBoneIndex;
+    private final BakedQuadData quads;
+    private final BakedVertexData vertices;
+    private final String[] sourceBones;
+
+    @OnlyIn(Dist.CLIENT)
+    private AcceleratedBedrockGeometryCache cache;
 
     public BakedGeometryChunk(int attachBoneIndex, BakedQuadData quads, BakedVertexData vertices, String[] sourceBones) {
-        this(attachBoneIndex, quads, vertices, sourceBones, NEXT_ID.getAndIncrement());
+        this.attachBoneIndex = attachBoneIndex;
+        this.quads = quads == null ? BakedQuadData.EMPTY : quads;
+        this.vertices = vertices == null ? BakedVertexData.EMPTY : vertices;
+        this.sourceBones = sourceBones.clone();
     }
 
-    public BakedGeometryChunk {
-        quads = quads == null ? BakedQuadData.EMPTY : quads;
-        vertices = vertices == null ? BakedVertexData.EMPTY : vertices;
-        sourceBones = sourceBones.clone();
+    public int attachBoneIndex() {
+        return attachBoneIndex;
+    }
+
+    public BakedQuadData quads() {
+        return quads;
+    }
+
+    public BakedVertexData vertices() {
+        return vertices;
+    }
+
+    @ApiStatus.Internal
+    @OnlyIn(Dist.CLIENT)
+    public AcceleratedBedrockGeometryCache getOrCreateCache() {
+        if (cache == null) {
+            cache = new AcceleratedBedrockGeometryCache();
+        }
+        return cache;
+    }
+
+    public String[] sourceBones() {
+        return sourceBones.clone();
     }
 
     public int quadCount() {

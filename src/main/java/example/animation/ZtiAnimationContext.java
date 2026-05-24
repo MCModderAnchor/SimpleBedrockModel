@@ -13,6 +13,7 @@ import com.maydaymemory.mae.control.runner.PlayingState;
 import com.maydaymemory.mae.control.runner.StopState;
 import example.client.render.entity.ZtiRenderer;
 import example.entity.Zti;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -20,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-@Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
+@Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ZtiAnimationContext implements Tickable {
     private static BedrockAnimation IDLE;
     private static BedrockAnimation RUNNING;
