@@ -138,7 +138,7 @@ public class MolangBenchmark {
         }
         {
             animContext = new MolangContext<>();
-            animContext.setAnimTime(1.5);
+            animContext.prepareEvaluation(1.5f);
             MochaEngine<?> e = MolangEngineHelper.createEngine(animContext);
             asm_animSimple  = MolangEngineHelper.compileExpression(e, EXPR_ANIM_SIMPLE);
             asm_animComplex = MolangEngineHelper.compileExpression(e, EXPR_ANIM_COMPLEX);
@@ -167,7 +167,7 @@ public class MolangBenchmark {
         }
         {
             animContext = new MolangContext<>();
-            animContext.setAnimTime(1.5);
+            animContext.prepareEvaluation(1.5f);
             animInterpEngine = MolangEngineHelper.createEngine(animContext);
             parsed_animSimple  = animInterpEngine.parse(EXPR_ANIM_SIMPLE);
             parsed_animComplex = animInterpEngine.parse(EXPR_ANIM_COMPLEX);
@@ -237,22 +237,22 @@ public class MolangBenchmark {
     // ==================== 6. 简单动画 ====================
 
     @Benchmark public double animSimple_asm() {
-        animContext.setAnimTime(tick++ * 0.05);
+        animContext.prepareEvaluation((float) (tick++ * 0.05));
         return asm_animSimple.evaluate(animContext);
     }
     @Benchmark public double animSimple_interpreted() {
-        animContext.setAnimTime(tick++ * 0.05);
+        animContext.prepareEvaluation((float) (tick++ * 0.05));
         return animInterpEngine.eval(parsed_animSimple);
     }
 
     // ==================== 7. 复杂动画 ====================
 
     @Benchmark public double animComplex_asm() {
-        animContext.setAnimTime(tick++ * 0.05);
+        animContext.prepareEvaluation((float) (tick++ * 0.05));
         return asm_animComplex.evaluate(animContext);
     }
     @Benchmark public double animComplex_interpreted() {
-        animContext.setAnimTime(tick++ * 0.05);
+        animContext.prepareEvaluation((float) (tick++ * 0.05));
         return animInterpEngine.eval(parsed_animComplex);
     }
 

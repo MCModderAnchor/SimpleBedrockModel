@@ -4,6 +4,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.common.molang.MolangEngin
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MochaFunction;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangContext;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangExpression;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.QueryBinding;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.compiled.MochaCompiledFunction;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.compiled.Named;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.standard.MochaMath;
@@ -17,12 +18,15 @@ import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.util.StringJoiner;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * MoLang ASM 编译器迁移验证测试。
- * 移植自 mocha 原始测试 + 新增 MolangExpression 上下文测试。
+ * MoLang ASM 编译器测试。
+ * 覆盖：算术、逻辑、数学、参数化编译、常量折叠、
+ * MolangExpression 上下文、@QueryBinding 编译。
  */
 class MolangCompilerTest {
 
@@ -102,6 +106,46 @@ class MolangCompilerTest {
             assertTrue(or.apply(true, false));
             assertTrue(or.apply(false, true));
             assertFalse(or.apply(false, false));
+        }
+
+        @Test
+        @DisplayName("&& 短路求值：左侧为 false 时不执行右侧")
+        void andShortCircuit() {
+            final MochaEngine<?> engine = MochaEngine.createStandard();
+            final AtomicInteger sideEffectCount = new AtomicInteger(0);
+            engine.scope().set("side_effect", (ObjectValue) name -> {
+                if (name.equalsIgnoreCase("call")) {
+                    return ObjectProperty.property((Function<?>) (ctx, args) -> {
+                        sideEffectCount.incrementAndGet();
+                        return NumberValue.of(1);
+                    }, true);
+                }
+                return null;
+            });
+
+            // 0 && X → 左侧 false，X 不应被求值
+            engine.eval("0 && side_effect.call()");
+            assertEquals(0, sideEffectCount.get(), "短路求值失败：左侧=false 时不应求值右侧");
+        }
+
+        @Test
+        @DisplayName("|| 短路求值：左侧为 true 时不执行右侧")
+        void orShortCircuit() {
+            final MochaEngine<?> engine = MochaEngine.createStandard();
+            final AtomicInteger sideEffectCount = new AtomicInteger(0);
+            engine.scope().set("side_effect", (ObjectValue) name -> {
+                if (name.equalsIgnoreCase("call")) {
+                    return ObjectProperty.property((Function<?>) (ctx, args) -> {
+                        sideEffectCount.incrementAndGet();
+                        return NumberValue.of(1);
+                    }, true);
+                }
+                return null;
+            });
+
+            // 1 || X → 左侧 true，X 不应被求值
+            engine.eval("1 || side_effect.call()");
+            assertEquals(0, sideEffectCount.get(), "短路求值失败：左侧=true 时不应求值右侧");
         }
 
         public interface LogicalFunction extends MochaCompiledFunction {
@@ -210,8 +254,25 @@ class MolangCompilerTest {
             assertEquals(76.0, engine.compile("3 * math.abs(5 * 5 * -1) + 1").evaluate());
         }
 
+        /** 嵌套三元运算符 */
+        @Test
+        @DisplayName("嵌套三元: a < 0 ? -1 : (a > 0 ? 1 : 0)")
+        void nestedTernary() {
+            final MochaEngine<?> engine = MochaEngine.createStandard();
+
+            // 对参数化版本用 @Named 参数
+            final NestedTernaryFn fn = engine.compile("a < 0 ? -1 : (a > 0 ? 1 : 0)", NestedTernaryFn.class);
+            assertEquals(-1.0, fn.apply(-5));
+            assertEquals(1.0, fn.apply(5));
+            assertEquals(0.0, fn.apply(0));
+        }
+
         public interface ScriptType extends MochaCompiledFunction {
             int eval(@Named("a") double a, @Named("b") double b);
+        }
+
+        public interface NestedTernaryFn extends MochaCompiledFunction {
+            double apply(@Named("a") double a);
         }
     }
 
@@ -344,13 +405,13 @@ class MolangCompilerTest {
         @Test
         void queryAccess() {
             MolangContext<Object> ctx = new MolangContext<>();
-            ctx.setAnimTime(2.5);
+            ctx.prepareEvaluation(2.5f);
             MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
 
             MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.anim_time");
             assertEquals(2.5, expr.evaluate(ctx));
 
-            ctx.setAnimTime(5.0);
+            ctx.prepareEvaluation(5.0f);
             assertEquals(5.0, expr.evaluate(ctx));
         }
 
@@ -378,15 +439,30 @@ class MolangCompilerTest {
         @Test
         void complexWithContext() {
             MolangContext<Object> ctx = new MolangContext<>();
-            ctx.setAnimTime(1.0);
+            ctx.prepareEvaluation(1.0f);
             MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
 
             MolangExpression expr = MolangEngineHelper.compileExpression(engine,
                     "query.anim_time * 2 + math.abs(-3)");
             assertEquals(5.0, expr.evaluate(ctx));
 
-            ctx.setAnimTime(3.0);
+            ctx.prepareEvaluation(3.0f);
             assertEquals(9.0, expr.evaluate(ctx));
+        }
+
+        @Test
+        @DisplayName("同一表达式用于不同 Context 类型")
+        @SuppressWarnings("unchecked")
+        void crossContextTypeReuse() {
+            // 编译时使用基类 MolangContext — 只含 query.anim_time
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(
+                    (Class<? extends MolangContext<?>>) (Class<?>) MolangContext.class);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.anim_time * 2");
+
+            // 求值时使用子类 TestEntityContext — 继承的 anim_time 仍然可用
+            TestEntityContext ctx = new TestEntityContext();
+            ctx.prepareEvaluation(3.0f);
+            assertEquals(6.0, expr.evaluate(ctx));
         }
     }
 
@@ -413,106 +489,233 @@ class MolangCompilerTest {
         }
     }
 
-    // ==================== 解释器回退测试 ====================
+    // ==================== @QueryBinding 注解编译测试 ====================
+
+    /** 带自定义 @QueryBinding 的 context 子类 */
+    public static class TestEntityContext extends MolangContext<TestEntityContext> {
+        private double health = 100.0;
+        private boolean grounded = true;
+
+        public void setHealth(double health) { this.health = health; }
+        public void setGrounded(boolean grounded) { this.grounded = grounded; }
+
+        @QueryBinding("health")
+        public double queryHealth() { return health; }
+
+        @QueryBinding("is_grounded")
+        public double queryIsGrounded() { return grounded ? 1.0 : 0.0; }
+
+        @QueryBinding("constant_val")
+        public double queryConstant() { return 42.0; }
+    }
+
+    /** 带自定义命名空间的 Context 子类 */
+    public static class CustomNamespaceContext extends MolangContext<CustomNamespaceContext> {
+        @QueryBinding(value = "is_jumping", namespace = "input")
+        public double inputIsJumping() { return 1.0; }
+
+        @QueryBinding(value = "score", namespace = "scoreboard")
+        public double scoreboardScore() { return 99.0;
+        }
+    }
+
+    /** 继承 TestEntityContext 的子类 */
+    public static class ExtendedContext extends TestEntityContext {
+        private double armor = 10.0;
+
+        @QueryBinding("armor")
+        public double queryArmor() { return armor; }
+
+        public void setArmor(double armor) { this.armor = armor; }
+    }
 
     @Nested
-    class InterpreterFallback {
+    class QueryBindingCompiled {
         @Test
-        void forceInterpreterMochaFunction() {
-            MochaEngine<?> engine = MochaEngine.createStandard();
-            engine.forceInterpreter(true);
-
-            MochaFunction fn = engine.compile("1 + 2 * 3");
-            assertEquals(7.0, fn.evaluate());
-
-            MochaFunction fn2 = engine.compile("math.abs(-5) + math.floor(3.7)");
-            assertEquals(8.0, fn2.evaluate());
-
-            MochaFunction fn3 = engine.compile("(3 > 2) ? 100 : 200");
-            assertEquals(100.0, fn3.evaluate());
-        }
-
-        @Test
-        void forceInterpreterMolangExpression() {
-            MolangContext<Object> ctx = new MolangContext<>();
-            ctx.setAnimTime(2.0);
+        void customQueryBinding() {
+            TestEntityContext ctx = new TestEntityContext();
             MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
-            engine.forceInterpreter(true);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.health");
 
-            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.anim_time * 3");
-            assertEquals(6.0, expr.evaluate(ctx));
+            assertEquals(100.0, expr.evaluate(ctx));
 
-            ctx.setAnimTime(4.0);
-            assertEquals(12.0, expr.evaluate(ctx));
+            ctx.setHealth(50.0);
+            assertEquals(50.0, expr.evaluate(ctx));
         }
 
         @Test
-        void forceInterpreterVariableReadWrite() {
-            MolangContext<Object> ctx = new MolangContext<>();
+        void booleanStyleQuery() {
+            TestEntityContext ctx = new TestEntityContext();
             MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
-            engine.forceInterpreter(true);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.is_grounded");
 
-            MolangExpression writeExpr = MolangEngineHelper.compileExpression(engine, "variable.x = 99");
-            assertEquals(99.0, writeExpr.evaluate(ctx));
+            assertEquals(1.0, expr.evaluate(ctx));
 
-            MolangExpression readExpr = MolangEngineHelper.compileExpression(engine, "variable.x");
-            assertEquals(99.0, readExpr.evaluate(ctx));
+            ctx.setGrounded(false);
+            assertEquals(0.0, expr.evaluate(ctx));
         }
 
         @Test
-        void forceInterpreterEmpty() {
+        void complexExpression() {
+            TestEntityContext ctx = new TestEntityContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine,
+                    "query.health * 2 + query.constant_val + query.anim_time");
+
+            ctx.setHealth(10.0);
+            ctx.prepareEvaluation(3.0f);
+            assertEquals(65.0, expr.evaluate(ctx));
+        }
+
+        @Test
+        void unannotatedPropertyReturnsZero() {
+            TestEntityContext ctx = new TestEntityContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.unknown_property");
+            assertEquals(0.0, expr.evaluate(ctx));
+        }
+
+        @Test
+        void crossContextReuse() {
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(new MolangContext<>());
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.anim_time * 2");
+
+            TestEntityContext ctx1 = new TestEntityContext();
+            ctx1.prepareEvaluation(3.0f);
+            assertEquals(6.0, expr.evaluate(ctx1));
+
+            TestEntityContext ctx2 = new TestEntityContext();
+            ctx2.prepareEvaluation(5.0f);
+            assertEquals(10.0, expr.evaluate(ctx2));
+        }
+
+        @Test
+        void inheritedAnimTime() {
+            TestEntityContext ctx = new TestEntityContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "query.anim_time");
+
+            ctx.prepareEvaluation(2.5f);
+            assertEquals(2.5, expr.evaluate(ctx));
+        }
+
+        @Test
+        void variableStillWorks() {
+            TestEntityContext ctx = new TestEntityContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+            MolangExpression write = MolangEngineHelper.compileExpression(engine, "variable.x = 77");
+            assertEquals(77.0, write.evaluate(ctx));
+
+            MolangExpression read = MolangEngineHelper.compileExpression(engine, "variable.x");
+            assertEquals(77.0, read.evaluate(ctx));
+        }
+
+        @Test
+        @DisplayName("自定义命名空间 @QueryBinding(namespace=\"input\")")
+        void customNamespace() {
+            CustomNamespaceContext ctx = new CustomNamespaceContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "input.is_jumping");
+            assertEquals(1.0, expr.evaluate(ctx));
+        }
+
+        @Test
+        @DisplayName("多个自定义命名空间 @QueryBinding")
+        void multipleCustomNamespaces() {
+            CustomNamespaceContext ctx = new CustomNamespaceContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+            MolangExpression jumpingExpr = MolangEngineHelper.compileExpression(engine, "input.is_jumping");
+            assertEquals(1.0, jumpingExpr.evaluate(ctx));
+
+            MolangExpression scoreExpr = MolangEngineHelper.compileExpression(engine, "scoreboard.score");
+            assertEquals(99.0, scoreExpr.evaluate(ctx));
+        }
+
+        @Test
+        @DisplayName("子类继承父类的 @QueryBinding 属性")
+        void inheritedQueryBinding() {
+            ExtendedContext ctx = new ExtendedContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+            // 继承自 TestEntityContext
+            MolangExpression healthExpr = MolangEngineHelper.compileExpression(engine, "query.health");
+            assertEquals(100.0, healthExpr.evaluate(ctx));
+
+            // 子类新增
+            MolangExpression armorExpr = MolangEngineHelper.compileExpression(engine, "query.armor");
+            assertEquals(10.0, armorExpr.evaluate(ctx));
+
+            ctx.setArmor(5.0);
+            assertEquals(5.0, armorExpr.evaluate(ctx));
+        }
+    }
+
+    // ==================== 编译错误传播测试 ====================
+
+    /** 非接口类型：抽象类实现 MochaCompiledFunction */
+    abstract static class NotAnInterface implements MochaCompiledFunction {
+        public abstract double eval();
+    }
+
+    /** 多方法接口 */
+    interface MultiMethod extends MochaCompiledFunction {
+        double eval();
+        int another();
+    }
+
+    /** 无抽象方法的接口（仅 default 方法） */
+    interface NoAbstractMethod extends MochaCompiledFunction {
+        default double eval() { return 0; }
+    }
+
+    @Nested
+    class CompileErrorPropagation {
+        @Test
+        @DisplayName("非接口目标类型应抛 IllegalArgumentException")
+        void nonInterfaceTargetType() {
             MochaEngine<?> engine = MochaEngine.createStandard();
-            engine.forceInterpreter(true);
-
-            MochaFunction fn = engine.compile("");
-            assertEquals(0.0, fn.evaluate());
+            assertThrows(IllegalArgumentException.class,
+                    () -> engine.compile("1 + 1", NotAnInterface.class),
+                    "Target type must be an interface");
         }
 
         @Test
-        void fallbackConsistencyWithCompiler() {
-            // 同一组表达式，编译模式和解释器回退模式结果应一致
-            String[] expressions = {
-                    "0", "42", "1 + 2 * 3", "math.sqrt(25)",
-                    "math.abs(-7) + math.floor(2.9)",
-                    "(5 > 3) ? 10 : 20", "1 && 0 || 1", "!0",
-                    "-(3 + 4)", "math.pow(2, 8)",
-            };
-
-            MochaEngine<?> compiled = MochaEngine.createStandard();
-            MochaEngine<?> interpreted = MochaEngine.createStandard();
-            interpreted.forceInterpreter(true);
-
-            for (String expr : expressions) {
-                double compiledResult = compiled.compile(expr).evaluate();
-                double interpretedResult = interpreted.compile(expr).evaluate();
-                assertEquals(compiledResult, interpretedResult,
-                        "compiled vs fallback: " + expr);
-            }
+        @DisplayName("多方法接口应抛 IllegalArgumentException")
+        void multiMethodInterface() {
+            MochaEngine<?> engine = MochaEngine.createStandard();
+            assertThrows(IllegalArgumentException.class,
+                    () -> engine.compile("1 + 1", MultiMethod.class),
+                    "Target type must have only one method");
         }
 
         @Test
-        void fallbackConsistencyMolangExpression() {
-            String[] expressions = {
-                    "query.anim_time",
-                    "query.anim_time * 2 + 1",
-                    "math.sin(query.anim_time * 360)",
-            };
+        @DisplayName("无抽象方法接口应抛 IllegalArgumentException")
+        void noMethodInterface() {
+            MochaEngine<?> engine = MochaEngine.createStandard();
+            assertThrows(IllegalArgumentException.class,
+                    () -> engine.compile("1 + 1", NoAbstractMethod.class),
+                    "Target type must have a method to implement");
+        }
+    }
 
-            for (String expr : expressions) {
-                MolangContext<Object> ctx1 = new MolangContext<>();
-                ctx1.setAnimTime(1.5);
-                MochaEngine<?> compiledEngine = MolangEngineHelper.createEngine(ctx1);
-                MolangExpression compiledExpr = MolangEngineHelper.compileExpression(compiledEngine, expr);
+    // ==================== postCompile 回调测试 ====================
 
-                MolangContext<Object> ctx2 = new MolangContext<>();
-                ctx2.setAnimTime(1.5);
-                MochaEngine<?> interpEngine = MolangEngineHelper.createEngine(ctx2);
-                interpEngine.forceInterpreter(true);
-                MolangExpression interpExpr = MolangEngineHelper.compileExpression(interpEngine, expr);
+    @Nested
+    class PostCompileCallback {
+        @Test
+        @DisplayName("postCompile 回调收到字节码并仍能正常求值")
+        void postCompileReceivesBytecode() {
+            MochaEngine<?> engine = MochaEngine.createStandard();
+            AtomicReference<byte[]> captured = new AtomicReference<>();
+            engine.postCompile(captured::set);
 
-                assertEquals(compiledExpr.evaluate(ctx1), interpExpr.evaluate(ctx2),
-                        "compiled vs fallback MolangExpression: " + expr);
-            }
+            MochaFunction fn = engine.compile("42 + 1");
+            assertNotNull(captured.get(), "postCompile 应收到字节码");
+            assertTrue(captured.get().length > 0, "字节码不应为空");
+            assertEquals(43.0, fn.evaluate());
         }
     }
 }

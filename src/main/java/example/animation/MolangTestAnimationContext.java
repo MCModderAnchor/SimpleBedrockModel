@@ -71,13 +71,8 @@ public class MolangTestAnimationContext {
     @Nullable
     public static Pose evaluatePose() {
         if (runner != null) {
-            SHARED_CONTEXT.setAnimTime(runner.getAnimationContext().getProgressInSecond());
-            MolangContext.setCurrent(SHARED_CONTEXT);
-            try {
-                return runner.evaluate();
-            } finally {
-                MolangContext.setCurrent(null);
-            }
+            // 每次求值时传入 context，不持有长期引用
+            return runner.evaluate(SHARED_CONTEXT);
         }
         return null;
     }

@@ -3,6 +3,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangContext;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangExpression;
 import com.maydaymemory.mae.basic.BaseKeyframe;
+import com.maydaymemory.mae.basic.IEvaluationContext;
 import com.maydaymemory.mae.basic.InterpolatableKeyframe;
 import com.maydaymemory.mae.basic.Interpolator;
 import com.maydaymemory.mae.basic.Rotation;
@@ -11,10 +12,13 @@ import org.joml.Vector3f;
 /**
  * 支持 Molang 表达式的 Rotation 关键帧。
  * 每次获取 pre/post 值时，会实时求值 Molang 表达式并转换为弧度。
- * 通过 {@link MolangContext#getCurrent()} 从 ThreadLocal 获取当前上下文。
+ * <p>
+ * 必须通过 {@link IEvaluationContext} 参数传入上下文（{@link #getPre(IEvaluationContext)} /
+ * {@link #getPost(IEvaluationContext)}）。无参版本返回零旋转。
  */
 public class MolangRotationKeyframe extends BaseKeyframe<Rotation> implements InterpolatableKeyframe<Rotation> {
     private static final float DEGREE_TO_RADIAN = (float) (Math.PI / 180);
+    private static final Rotation ZERO = new Rotation(new Vector3f());
 
     private final MolangExpression[] preFunctions;
     private final MolangExpression[] postFunctions;
@@ -44,14 +48,38 @@ public class MolangRotationKeyframe extends BaseKeyframe<Rotation> implements In
         this.interpolator = interpolator;
     }
 
+    /**
+     * @deprecated 无 Molang 上下文时无法求值，返回零旋转。请使用 {@link #getPre(IEvaluationContext)}。
+     */
     @Override
+    @Deprecated
     public Rotation getPre() {
-        return evaluate(preFunctions);
+        return ZERO;
+    }
+
+    /**
+     * @deprecated 无 Molang 上下文时无法求值，返回零旋转。请使用 {@link #getPost(IEvaluationContext)}。
+     */
+    @Override
+    @Deprecated
+    public Rotation getPost() {
+        return ZERO;
     }
 
     @Override
-    public Rotation getPost() {
-        return evaluate(postFunctions);
+    public Rotation getPre(IEvaluationContext ctx) {
+        if (ctx instanceof MolangContext<?> mc) {
+            return evaluate(preFunctions, mc);
+        }
+        return ZERO;
+    }
+
+    @Override
+    public Rotation getPost(IEvaluationContext ctx) {
+        if (ctx instanceof MolangContext<?> mc) {
+            return evaluate(postFunctions, mc);
+        }
+        return ZERO;
     }
 
     @Override
@@ -64,8 +92,7 @@ public class MolangRotationKeyframe extends BaseKeyframe<Rotation> implements In
         return getPre();
     }
 
-    private Rotation evaluate(MolangExpression[] functions) {
-        MolangContext<?> ctx = MolangContext.getCurrent();
+    private Rotation evaluate(MolangExpression[] functions, MolangContext<?> ctx) {
         float x = (float) functions[0].evaluate(ctx) * mulX * DEGREE_TO_RADIAN;
         float y = (float) functions[1].evaluate(ctx) * mulY * DEGREE_TO_RADIAN;
         float z = (float) functions[2].evaluate(ctx) * mulZ * DEGREE_TO_RADIAN;

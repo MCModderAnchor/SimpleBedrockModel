@@ -25,10 +25,10 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.parser.ast.*;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.Entity;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.EntityDerivedBinding;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.JavaFieldBinding;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.JavaFunction;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.JavaObjectBinding;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.QueryBinding;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.value.Function;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.value.NumberValue;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.value.ObjectValue;
@@ -36,6 +36,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.value.Valu
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.util.AsmUtil;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.util.CaseInsensitiveStringHashMap;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -510,27 +511,18 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
 
             final int entityLoadIndex = functionCompileState.entityParameterLoadIndex();
             if (entityLoadIndex >= 0) {
-                final String getterMethod;
-                if (name.equalsIgnoreCase("query") || name.equalsIgnoreCase("q")) {
-                    getterMethod = "getQueryBinding";
-                } else if (name.equalsIgnoreCase("variable") || name.equalsIgnoreCase("v")) {
-                    getterMethod = "getVariableStorage";
-                } else {
-                    getterMethod = null;
-                }
-
-                if (getterMethod != null) {
+                if (name.equalsIgnoreCase("variable") || name.equalsIgnoreCase("v")) {
                     final String entityInternal = Type.getInternalName(functionCompileState.entityParameterType());
                     final Method getter;
                     try {
-                        getter = functionCompileState.entityParameterType().getMethod(getterMethod);
+                        getter = functionCompileState.entityParameterType().getMethod("getVariableStorage");
                     } catch (NoSuchMethodException e) {
-                        throw new IllegalStateException("Could not resolve " + getterMethod, e);
+                        throw new IllegalStateException("Could not resolve getVariableStorage", e);
                     }
                     final Type getterReturnType = Type.getType(getter.getReturnType());
 
                     mv.visitVarInsn(Opcodes.ALOAD, entityLoadIndex);
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, entityInternal, getterMethod,
+                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, entityInternal, "getVariableStorage",
                             Type.getMethodDescriptor(getterReturnType), false);
                     mv.visitLdcInsn(property);
                     mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
@@ -539,6 +531,27 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                     mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
                             VALUE_TYPE.getInternalName(), "getAsNumber",
                             Type.getMethodDescriptor(Type.DOUBLE_TYPE), true);
+                    return new CompileVisitResult(Type.DOUBLE_TYPE);
+                }
+
+                // 对于任意非 variable/temp 的命名空间，尝试 @QueryBinding
+                final Method queryMethod = findQueryMethod(property, name);
+                if (queryMethod != null) {
+                    final Class<?> ownerClass = queryMethod.getDeclaringClass();
+                    mv.visitVarInsn(Opcodes.ALOAD, entityLoadIndex);
+                    if (!ownerClass.isAssignableFrom(functionCompileState.entityParameterType())) {
+                        mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(ownerClass));
+                    }
+                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
+                            Type.getInternalName(ownerClass),
+                            queryMethod.getName(),
+                            Type.getMethodDescriptor(Type.DOUBLE_TYPE), false);
+                    return new CompileVisitResult(Type.DOUBLE_TYPE);
+                }
+
+                // @QueryBinding 未命中：query/q 返回 0，其他命名空间回退 scope
+                if (name.equalsIgnoreCase("query") || name.equalsIgnoreCase("q")) {
+                    mv.visitInsn(Opcodes.DCONST_0);
                     return new CompileVisitResult(Type.DOUBLE_TYPE);
                 }
             }
@@ -569,30 +582,6 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
 
         if (objectValue instanceof ObjectValue) {
             final ObjectValue actualObjectValue = (ObjectValue) objectValue;
-
-            // EntityDerivedBinding: load from entity parameter at runtime
-            if (actualObjectValue instanceof EntityDerivedBinding) {
-                final EntityDerivedBinding derived = (EntityDerivedBinding) actualObjectValue;
-                final Method accessor = derived.accessor();
-                final int entityLoadIndex = functionCompileState.entityParameterLoadIndex();
-
-                if (entityLoadIndex >= 0) {
-                    final String entityInternal = Type.getInternalName(functionCompileState.entityParameterType());
-                    final Type accessorReturnType = Type.getType(accessor.getReturnType());
-
-                    mv.visitVarInsn(Opcodes.ALOAD, entityLoadIndex);
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, entityInternal, accessor.getName(),
-                            Type.getMethodDescriptor(accessorReturnType), false);
-                    mv.visitLdcInsn(property);
-                    mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
-                            OBJECT_VALUE_TYPE.getInternalName(), "get",
-                            Type.getMethodDescriptor(VALUE_TYPE, STRING_TYPE), true);
-                    mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
-                            VALUE_TYPE.getInternalName(), "getAsNumber",
-                            Type.getMethodDescriptor(Type.DOUBLE_TYPE), true);
-                    return new CompileVisitResult(Type.DOUBLE_TYPE);
-                }
-            }
 
             // JavaObjectBinding: fields and bindings
             if (actualObjectValue instanceof JavaObjectBinding) {
@@ -776,5 +765,35 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
     @Override
     public CompileVisitResult visit(final @NotNull Expression expression) {
         throw new UnsupportedOperationException("Unsupported expression type: " + expression);
+    }
+
+    /**
+     * 在 entity 类型及其父类中查找带有指定命名空间和属性名的 {@link QueryBinding} 方法。
+     */
+    @Nullable
+    private Method findQueryMethod(final String property, final String namespace) {
+        final Class<?> declaredType = functionCompileState.entityParameterType();
+        Method m = findQueryMethodOnType(declaredType, property, namespace);
+        if (m != null) return m;
+        final Object entity = functionCompileState.compiler().entity();
+        if (entity != null) {
+            m = findQueryMethodOnType(entity.getClass(), property, namespace);
+        }
+        return m;
+    }
+
+    @Nullable
+    private static Method findQueryMethodOnType(final Class<?> type, final String property, final String namespace) {
+        for (final Method m : type.getMethods()) {
+            final QueryBinding qb = m.getAnnotation(QueryBinding.class);
+            if (qb != null && qb.value().equals(property)
+                    && qb.namespace().equalsIgnoreCase(namespace)
+                    && m.getReturnType() == double.class
+                    && m.getParameterCount() == 0
+                    && !Modifier.isStatic(m.getModifiers())) {
+                return m;
+            }
+        }
+        return null;
     }
 }
