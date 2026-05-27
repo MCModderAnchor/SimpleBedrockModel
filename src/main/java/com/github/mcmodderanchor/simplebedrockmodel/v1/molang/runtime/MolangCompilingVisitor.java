@@ -549,11 +549,7 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                     return new CompileVisitResult(Type.DOUBLE_TYPE);
                 }
 
-                // @QueryBinding 未命中：query/q 返回 0，其他命名空间回退 scope
-                if (name.equalsIgnoreCase("query") || name.equalsIgnoreCase("q")) {
-                    mv.visitInsn(Opcodes.DCONST_0);
-                    return new CompileVisitResult(Type.DOUBLE_TYPE);
-                }
+                // @QueryBinding 未命中 → 回退到 scope 查找
             }
         }
 
@@ -642,7 +638,9 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
             }
         }
 
-        return null;
+        // namespace/property not found in scope either → 0
+        mv.visitInsn(Opcodes.DCONST_0);
+        return new CompileVisitResult(Type.DOUBLE_TYPE);
     }
 
     @Override
@@ -673,6 +671,17 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
         });
 
         if (!(functionValue instanceof Function<?>)) {
+            // scope 中没找到 → 尝试 @QueryBinding 带参方法
+            if (functionExpr instanceof AccessExpression) {
+                final AccessExpression accessExpr = (AccessExpression) functionExpr;
+                if (accessExpr.object() instanceof IdentifierExpression) {
+                    final String namespace = ((IdentifierExpression) accessExpr.object()).name();
+                    final Method queryMethod = findQueryCallMethod(accessExpr.property(), namespace);
+                    if (queryMethod != null) {
+                        return compileQueryBindingCall(queryMethod, expression.arguments());
+                    }
+                }
+            }
             mv.visitInsn(Opcodes.DCONST_0);
             return new CompileVisitResult(Type.DOUBLE_TYPE);
         }
@@ -768,6 +777,82 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
     }
 
     /**
+     * 编译对 @QueryBinding 带参方法的调用。
+     */
+    private CompileVisitResult compileQueryBindingCall(final Method method, final List<Expression> arguments) {
+        final Parameter[] parameters = method.getParameters();
+        final int entityLoadIndex = functionCompileState.entityParameterLoadIndex();
+        final Class<?> entityParamType = functionCompileState.entityParameterType();
+        final Class<?> ownerClass = method.getDeclaringClass();
+
+        // 加载 entity（含 CHECKCAST 如果需要）
+        if (entityLoadIndex >= 0) {
+            mv.visitVarInsn(Opcodes.ALOAD, entityLoadIndex);
+            if (entityParamType != null && !ownerClass.isAssignableFrom(entityParamType)) {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(ownerClass));
+            }
+        } else {
+            // 无 @Entity 参数 → 从 requirements 加载
+            final Object entityObj = functionCompileState.compiler().entity();
+            if (entityObj != null && ownerClass.isInstance(entityObj)) {
+                requirements.put("__entity__", entityObj);
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitFieldInsn(Opcodes.GETFIELD,
+                        functionCompileState.className(),
+                        "__entity__",
+                        Type.getDescriptor(entityObj.getClass()));
+            } else {
+                mv.visitInsn(Opcodes.ACONST_NULL);
+            }
+        }
+
+        // 加载各参数
+        final Iterator<Expression> it = arguments.iterator();
+        for (int i = 0; i < parameters.length; i++) {
+            final Parameter param = parameters[i];
+            final Type paramType = Type.getType(param.getType());
+
+            if (!it.hasNext()) {
+                AsmUtil.addConstZero(mv, paramType);
+                continue;
+            }
+
+            final Expression arg = it.next();
+            final Type prevExpected = expectedType;
+            if (paramType.getSort() <= Type.DOUBLE) {
+                expectedType = Type.DOUBLE_TYPE;
+            } else if (paramType.equals(STRING_TYPE)) {
+                expectedType = STRING_TYPE;
+            } else {
+                expectedType = null;
+            }
+            final CompileVisitResult argResult = arg.visit(this);
+            expectedType = prevExpected;
+
+            if (argResult.lastPushedType() != null && !argResult.lastPushedType().equals(paramType)) {
+                AsmUtil.addCast(mv, argResult.lastPushedType(), paramType);
+            }
+        }
+
+        final Type returnType = Type.getType(method.getReturnType());
+        final Type[] paramTypesList = new Type[parameters.length];
+        for (int j = 0; j < parameters.length; j++) {
+            paramTypesList[j] = Type.getType(parameters[j].getType());
+        }
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
+                Type.getInternalName(ownerClass),
+                method.getName(),
+                Type.getMethodDescriptor(returnType, paramTypesList),
+                false);
+
+        final Type currentExpected = expectedType;
+        if (currentExpected != null && !returnType.equals(currentExpected)) {
+            AsmUtil.addCast(mv, returnType, currentExpected);
+        }
+        return new CompileVisitResult(currentExpected != null ? currentExpected : returnType);
+    }
+
+    /**
      * 在 entity 类型及其父类中查找带有指定命名空间和属性名的 {@link QueryBinding} 方法。
      */
     @Nullable
@@ -790,6 +875,35 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                     && qb.namespace().equalsIgnoreCase(namespace)
                     && m.getReturnType() == double.class
                     && m.getParameterCount() == 0
+                    && !Modifier.isStatic(m.getModifiers())) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 与 {@link #findQueryMethod} 相同，但不限制参数数量——用于函数调用路径。
+     */
+    @Nullable
+    private Method findQueryCallMethod(final String property, final String namespace) {
+        final Class<?> declaredType = functionCompileState.entityParameterType();
+        Method m = findQueryCallMethodOnType(declaredType, property, namespace);
+        if (m != null) return m;
+        final Object entity = functionCompileState.compiler().entity();
+        if (entity != null) {
+            m = findQueryCallMethodOnType(entity.getClass(), property, namespace);
+        }
+        return m;
+    }
+
+    @Nullable
+    private static Method findQueryCallMethodOnType(final Class<?> type, final String property, final String namespace) {
+        for (final Method m : type.getMethods()) {
+            final QueryBinding qb = m.getAnnotation(QueryBinding.class);
+            if (qb != null && qb.value().equals(property)
+                    && qb.namespace().equalsIgnoreCase(namespace)
+                    && m.getReturnType() == double.class
                     && !Modifier.isStatic(m.getModifiers())) {
                 return m;
             }

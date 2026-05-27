@@ -653,6 +653,58 @@ class MolangCompilerTest {
         }
     }
 
+    // ==================== @QueryBinding 带参方法测试 ====================
+
+    /** 带参数的 @QueryBinding Context */
+    public static class ParamQueryContext extends MolangContext<ParamQueryContext> {
+        private double multiplier = 2.0;
+
+        @QueryBinding(value = "scaled", namespace = "custom")
+        public double scaled(@Named("x") double x) {
+            return x * multiplier;
+        }
+
+        @QueryBinding(value = "distance", namespace = "custom")
+        public double distance(@Named("x") double x, @Named("y") double y) {
+            return Math.sqrt(x * x + y * y);
+        }
+
+        public void setMultiplier(double v) { this.multiplier = v; }
+    }
+
+    @Nested
+    class QueryBindingWithParams {
+        @Test
+        @DisplayName("单参数 @QueryBinding 方法调用")
+        void singleParam() {
+            ParamQueryContext ctx = new ParamQueryContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "custom.scaled(10)");
+            assertEquals(20.0, expr.evaluate(ctx));
+        }
+
+        @Test
+        @DisplayName("多参数 @QueryBinding 方法调用")
+        void multiParam() {
+            ParamQueryContext ctx = new ParamQueryContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "custom.distance(3, 4)");
+            assertEquals(5.0, expr.evaluate(ctx));
+        }
+
+        @Test
+        @DisplayName("context 状态变化影响带参方法结果")
+        void stateAffectsResult() {
+            ParamQueryContext ctx = new ParamQueryContext();
+            MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "custom.scaled(5)");
+
+            assertEquals(10.0, expr.evaluate(ctx));
+            ctx.setMultiplier(3.0);
+            assertEquals(15.0, expr.evaluate(ctx));
+        }
+    }
+
     // ==================== 编译错误传播测试 ====================
 
     /** 非接口类型：抽象类实现 MochaCompiledFunction */
