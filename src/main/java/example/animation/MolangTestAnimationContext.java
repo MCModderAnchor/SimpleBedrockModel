@@ -21,7 +21,6 @@ import java.util.List;
 
 /**
  * Molang 动画测试用上下文。
- * 使用 AnimationRunner 驱动含 Molang 表达式的动画，更接近实际使用场景。
  */
 @Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
 public class MolangTestAnimationContext {
@@ -32,6 +31,11 @@ public class MolangTestAnimationContext {
     private static BedrockAnimation molangTestAnimation;
     @Nullable
     private static AnimationRunner runner;
+
+    @Nullable
+    public static BedrockAnimation getAnimation() {
+        return molangTestAnimation;
+    }
 
     public static MochaEngine<?> getSharedEngine() {
         return SHARED_ENGINE;

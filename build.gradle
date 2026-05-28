@@ -126,7 +126,7 @@ dependencies {
 //        jarJar.ranged(it, "[3.30.2-GA,)")
 //    }
 
-    compileOnly fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
+    implementation fg.deobf("maven.modrinth:acceleratedrendering:1.0.8-1.20.1-alpha")
     runtimeOnly fg.deobf("curse.maven:configured-457570:5180900")
 
     // 测试用mod

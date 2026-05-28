@@ -15,6 +15,7 @@ import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import example.animation.ClientMolangAnimationState;
 import example.animation.MolangTestAnimationContext;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
@@ -89,11 +90,13 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
         instance.resetPose();
 
         if (!polyMeshTest) {
-            MolangTestAnimationContext.tick();
-            Pose molangPose = MolangTestAnimationContext.evaluatePose();
-            if (molangPose != null) {
-                Pose blended = BLENDER.blend(instance.getBindPose(), molangPose);
-                instance.applyPose(blended);
+            ClientMolangAnimationState animState = blockEntity.getClientMolangAnimationState();
+            if (animState != null) {
+                Pose molangPose = animState.getOrEvaluatePose(MolangTestAnimationContext.getSharedContext());
+                if (molangPose != null) {
+                    Pose blended = BLENDER.blend(instance.getBindPose(), molangPose);
+                    instance.applyPose(blended);
+                }
             }
         }
 
