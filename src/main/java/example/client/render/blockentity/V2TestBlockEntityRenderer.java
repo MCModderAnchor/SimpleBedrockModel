@@ -3,6 +3,7 @@ package example.client.render.blockentity;
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.GsonUtil;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
@@ -15,8 +16,8 @@ import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import example.animation.ClientMolangAnimationState;
-import example.animation.MolangTestAnimationContext;
+import example.animation.TestBlockAnimationContext;
+import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
 import net.minecraft.client.Minecraft;
@@ -32,18 +33,14 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockEntity> {
     private static final ResourceLocation TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/test.png");
     private static final ResourceLocation POLY_MESH_TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/vct.png");
+    private static final ResourceLocation TEST_ANIM_PATH = ExampleModRegister.modLoc("animations/test.json");
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
-    private static final Set<String> TEST_ANIMATED_BONES = Set.of(
-            "root", "BenTi_Head", "Arm_Left", "Left_ForeArm", "Arm_Right", "Right_ForeArm",
-            "Leg_Left", "Leg_Right", "Left_Calf", "Right_Calf"
-    );
 
     private final Supplier<BakedBedrockModel> testModelSupplier;
     private final Supplier<BakedBedrockModel> polyMeshTestModelSupplier;
@@ -56,7 +53,33 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
     }
 
     private BakedBedrockModel loadTestModel() {
-        return loadModel(ExampleModRegister.modLoc("models/bedrock/test.json"), new BakerOptions(TEST_ANIMATED_BONES, Set.of(), true, false), "test");
+        try {
+            BedrockModelPOJO modelPOJO;
+            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(ExampleModRegister.modLoc("models/bedrock/test.json"));
+                 InputStreamReader reader = new InputStreamReader(stream)) {
+                modelPOJO = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockModelPOJO.class);
+            }
+
+            BedrockAnimationFile animationFile;
+            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(TEST_ANIM_PATH);
+                 InputStreamReader reader = new InputStreamReader(stream)) {
+                animationFile = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockAnimationFile.class);
+            }
+
+            BakerOptions options = BakerOptions.ofAnimationFile(animationFile);
+            BakedBedrockModel model = BakedBedrockModel.bake(modelPOJO, options);
+
+            // 使用 v2 模型的骨骼索引初始化动画
+            TestBlockAnimationContext.initialize(animationFile, model);
+
+            SimpleBedrockModel.LOGGER.info("Loaded v2 test model: bones={}, cubeChunks={}, meshChunks={}, animatedBones={}",
+                    model.bones().length, model.cubeChunks().length, model.meshChunks().length,
+                    options.animatedBones().size());
+            return model;
+        } catch (Exception e) {
+            SimpleBedrockModel.LOGGER.error("Failed to load v2 test model", e);
+            return null;
+        }
     }
 
     private BakedBedrockModel loadPolyMeshTestModel() {
@@ -90,14 +113,11 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
         instance.resetPose();
 
         if (!polyMeshTest) {
-            ClientMolangAnimationState animState = blockEntity.getClientMolangAnimationState();
-            if (animState != null) {
-                Pose molangPose = animState.getOrEvaluatePose(MolangTestAnimationContext.getSharedContext());
-                if (molangPose != null) {
-                    Pose blended = BLENDER.blend(instance.getBindPose(), molangPose);
-                    instance.applyPose(blended);
-                }
-            }
+            TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
+            animationInstance.renderTick();
+            Pose animationPose = animationInstance.getStateMachine().getPose();
+            Pose blended = BLENDER.blend(instance.getBindPose(), animationPose);
+            instance.applyPose(blended);
         }
 
         ResourceLocation texture = polyMeshTest ? POLY_MESH_TEST_TEXTURE : TEST_TEXTURE;

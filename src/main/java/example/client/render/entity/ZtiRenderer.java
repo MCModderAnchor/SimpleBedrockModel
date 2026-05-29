@@ -1,8 +1,15 @@
 package example.client.render.entity;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.EntityModel;
+import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.BedrockModelResourceSet;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.GsonUtil;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneDefinition;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
 import com.google.common.base.Suppliers;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
 import com.maydaymemory.mae.basic.Pose;
@@ -11,7 +18,9 @@ import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import example.animation.ZtiAnimationContext;
 import example.entity.Zti;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -19,50 +28,143 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import org.jetbrains.annotations.NotNull;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 public class ZtiRenderer extends EntityRenderer<Zti> {
     public static final ResourceLocation TEXTURE = new ResourceLocation("example", "textures/entity/zti.png");
-    public static final ResourceLocation MODEL = new ResourceLocation("example", "zti.geo");
-    public static final ResourceLocation ANIMATION = new ResourceLocation("example", "zti.animation");
+
+    private static final ResourceLocation MODEL_PATH = new ResourceLocation("example", "models/bedrock/zti.geo.json");
+    private static final ResourceLocation ANIM_PATH = new ResourceLocation("example", "animations/zti.animation.json");
 
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
-    private final Supplier<EntityModel> modelSupplier;
+    private final Supplier<BakedBedrockModel> modelSupplier;
+    private final WeakHashMap<Zti, BedrockModelInstance> instanceCache = new WeakHashMap<>();
 
     public ZtiRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.shadowRadius = 1.0F;
-        this.modelSupplier = Suppliers.memoize(() -> (EntityModel) BedrockModelResourceSet.getInstance().getModel(MODEL));
+        this.modelSupplier = Suppliers.memoize(this::loadModel);
+    }
+
+    private BakedBedrockModel loadModel() {
+        try {
+            BedrockModelPOJO modelPOJO;
+            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(MODEL_PATH);
+                 InputStreamReader reader = new InputStreamReader(stream)) {
+                modelPOJO = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockModelPOJO.class);
+            }
+
+            BedrockAnimationFile animationFile;
+            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(ANIM_PATH);
+                 InputStreamReader reader = new InputStreamReader(stream)) {
+                animationFile = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockAnimationFile.class);
+            }
+
+            BakerOptions options = BakerOptions.ofAnimationFile(animationFile);
+            BakedBedrockModel model = BakedBedrockModel.bake(modelPOJO, options);
+
+            // 使用 v2 模型的骨骼索引初始化动画，替代 v1 的 RegisterBedrockAnimationReloadListenerEvent 流程
+            ZtiAnimationContext.initialize(animationFile, model);
+
+            SimpleBedrockModel.LOGGER.info("Loaded v2 ZTI model: bones={}, cubeChunks={}, meshChunks={}, animatedBones={}",
+                    model.bones().length, model.cubeChunks().length, model.meshChunks().length,
+                    options.animatedBones().size());
+
+            // 调试日志：打印骨骼层级与几何体分布
+            logBoneHierarchy(model);
+            // 调试日志：打印 mesh chunk 的顶点包围盒
+            logMeshChunkBounds(model);
+            return model;
+        } catch (Exception e) {
+            SimpleBedrockModel.LOGGER.error("Failed to load v2 ZTI model", e);
+            return null;
+        }
     }
 
     @Override
-    public void render(Zti entity, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
-        EntityModel model = modelSupplier.get();
-        if (model != null) {
-            entity.getAnimationInstance().renderTick();
-            Pose blendedPose = BLENDER.blend(model.getBindPose(), entity.getAnimationInstance().getStateMachine().getPose());
-            model.applyPose(blendedPose);
-
-            poseStack.pushPose();
-
-            poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)));
-
-            model.renderToBuffer(poseStack, bufferSource,
-                    RenderType.entityCutout(TEXTURE),
-                    BedrockModelRenderTypes.polyMeshCutout(TEXTURE),
-                    packedLight,
-                    OverlayTexture.pack(0f, entity.hurtTime > 0 || entity.deathTime > 0)
-            );
-            model.applyPose(model.getBindPose());
-            poseStack.popPose();
+    public void render(@NotNull Zti entity, float entityYaw, float partialTick, @NotNull PoseStack poseStack,
+                       @NotNull MultiBufferSource bufferSource, int packedLight) {
+        BakedBedrockModel model = modelSupplier.get();
+        if (model == null) {
+            return;
         }
+        BedrockModelInstance instance = instanceCache.computeIfAbsent(entity, ignored -> model.createInstance());
+        instance.resetPose();
+
+        entity.getAnimationInstance().renderTick();
+        Pose blended = BLENDER.blend(instance.getBindPose(), entity.getAnimationInstance().getStateMachine().getPose());
+        instance.applyPose(blended);
+
+        poseStack.pushPose();
+        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)));
+
+        instance.renderToBuffer(poseStack, bufferSource,
+                RenderType.entityCutout(TEXTURE),
+                BedrockModelRenderTypes.polyMeshCutout(TEXTURE),
+                packedLight,
+                OverlayTexture.pack(0f, entity.hurtTime > 0 || entity.deathTime > 0)
+        );
+        poseStack.popPose();
+
         super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
     }
 
     @Override
-    public ResourceLocation getTextureLocation(Zti entity) {
+    public ResourceLocation getTextureLocation(@NotNull Zti entity) {
         return TEXTURE;
+    }
+
+    private static void logBoneHierarchy(BakedBedrockModel model) {
+        SimpleBedrockModel.LOGGER.info("=== ZTI v2 bone hierarchy ({}) ===", model.bones().length);
+        for (BoneDefinition bone : model.bones()) {
+            boolean hasQuads = false;
+            boolean hasVerts = false;
+            for (BakedGeometryChunk chunk : model.cubeChunks()) {
+                if (chunk.attachBoneIndex() == bone.index()) { hasQuads = true; break; }
+            }
+            for (BakedGeometryChunk chunk : model.meshChunks()) {
+                if (chunk.attachBoneIndex() == bone.index()) { hasVerts = true; break; }
+            }
+            SimpleBedrockModel.LOGGER.info(String.format(
+                    "  [%d] %s  parent=%d  pivot=(%.3f, %.3f, %.3f)  bindRot=(%.1f, %.1f, %.1f)  bindLocal=%s  hasQuads=%s hasVerts=%s",
+                    bone.index(), bone.name(), bone.parentIndex(),
+                    bone.pivotX(), bone.pivotY(), bone.pivotZ(),
+                    Math.toDegrees(bone.bindEulerRotation().x()),
+                    Math.toDegrees(bone.bindEulerRotation().y()),
+                    Math.toDegrees(bone.bindEulerRotation().z()),
+                    bone.bindLocalTransform() != null ? "non-null" : "NULL",
+                    hasQuads, hasVerts));
+        }
+    }
+
+    private static void logMeshChunkBounds(BakedBedrockModel model) {
+        for (BakedGeometryChunk chunk : model.meshChunks()) {
+            if (!chunk.hasVertices()) continue;
+            float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
+            float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
+            float[] pos = chunk.vertices().positions();
+            for (int v = 0; v < chunk.vertices().vertexCount(); v++) {
+                float vx = pos[v * 3];
+                float vy = pos[v * 3 + 1];
+                float vz = pos[v * 3 + 2];
+                if (vx < minX) minX = vx;
+                if (vy < minY) minY = vy;
+                if (vz < minZ) minZ = vz;
+                if (vx > maxX) maxX = vx;
+                if (vy > maxY) maxY = vy;
+                if (vz > maxZ) maxZ = vz;
+            }
+            BoneDefinition bone = model.bones()[chunk.attachBoneIndex()];
+            SimpleBedrockModel.LOGGER.info(String.format(
+                    "  Mesh chunk on bone [%d] %s: %d vertices, bounds=(%.3f,%.3f,%.3f) -> (%.3f,%.3f,%.3f)",
+                    bone.index(), bone.name(), chunk.vertices().vertexCount(),
+                    minX, minY, minZ, maxX, maxY, maxZ));
+        }
     }
 }

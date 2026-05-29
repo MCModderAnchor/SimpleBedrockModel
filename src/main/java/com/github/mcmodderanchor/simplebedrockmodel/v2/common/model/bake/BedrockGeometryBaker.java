@@ -247,9 +247,9 @@ public class BedrockGeometryBaker {
                                                        float[][] uvs, int positionIndex, int normalIndex, int uvIndex) {
         float[] position = getPolyMeshArray(positions, positionIndex);
         Vector3f bakedPosition = new Vector3f(
-                (-getPolyMeshValue(position, 0) / 16.0f) - part.pivotX,
-                (getPolyMeshValue(position, 1) / 16.0f) - part.pivotY,
-                (getPolyMeshValue(position, 2) / 16.0f) - part.pivotZ
+                -getPolyMeshValue(position, 0) / 16.0f,
+                getPolyMeshValue(position, 1) / 16.0f,
+                getPolyMeshValue(position, 2) / 16.0f
         ).mulPosition(toAttach);
 
         Vector3f bakedNormal = new Vector3f();
