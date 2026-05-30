@@ -1,6 +1,7 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.ISodiumVertexWriter;
+
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.ISodiumVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedQuadData;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedVertexData;

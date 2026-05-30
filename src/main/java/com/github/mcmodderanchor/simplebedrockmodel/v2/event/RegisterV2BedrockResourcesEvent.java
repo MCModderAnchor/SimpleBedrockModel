@@ -11,9 +11,10 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelEntr
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResource;
 import com.google.common.collect.Maps;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.event.IModBusEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.Event;
+import net.neoforged.fml.event.IModBusEvent;
+
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

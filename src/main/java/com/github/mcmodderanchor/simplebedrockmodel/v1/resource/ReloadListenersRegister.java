@@ -6,6 +6,9 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnim
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelReloadListenerEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.resource.ParticleDefinitionLoader;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.event.RegisterV2BedrockResourcesEvent;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
@@ -35,7 +38,7 @@ public class ReloadListenersRegister {
 
 
             RegisterV2BedrockResourcesEvent event5 = new RegisterV2BedrockResourcesEvent(Dist.CLIENT);
-            ModLoader.get().postEvent(event5);
+            ModLoader.postEvent(event5);
             BedrockAnimationResources.INSTANCE = new BedrockAnimationResources(event5.getAnimationRegistry());
             BedrockModelResources.INSTANCE = new BedrockModelResources(event5.getModelRegistry(), event5.getReloadListeners());
 
@@ -68,7 +71,7 @@ public class ReloadListenersRegister {
 
 
             RegisterV2BedrockResourcesEvent event5 = new RegisterV2BedrockResourcesEvent(Dist.DEDICATED_SERVER);
-            ModLoader.get().postEvent(event5);
+            ModLoader.postEvent(event5);
             BedrockAnimationResources.INSTANCE = new BedrockAnimationResources(event5.getAnimationRegistry());
             BedrockModelResources.INSTANCE = new BedrockModelResources(event5.getModelRegistry(), event5.getReloadListeners());
 
