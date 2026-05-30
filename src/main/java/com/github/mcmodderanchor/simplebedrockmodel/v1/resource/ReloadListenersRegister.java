@@ -6,6 +6,9 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnim
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelReloadListenerEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.resource.ParticleDefinitionLoader;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.event.RegisterV2BedrockResourcesEvent;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
@@ -34,8 +37,16 @@ public class ReloadListenersRegister {
             BedrockAnimationResourceSet.INSTANCE = new BedrockAnimationResourceSet(event3.getAnimationRegistry(), event4.getListeners());
 
 
+            RegisterV2BedrockResourcesEvent event5 = new RegisterV2BedrockResourcesEvent(Dist.CLIENT);
+            ModLoader.get().postEvent(event5);
+            BedrockAnimationResources.INSTANCE = new BedrockAnimationResources(event5.getAnimationRegistry());
+            BedrockModelResources.INSTANCE = new BedrockModelResources(event5.getModelRegistry(), event5.getReloadListeners());
+
+
             event.registerReloadListener(BedrockModelResourceSet.INSTANCE);
             event.registerReloadListener(BedrockAnimationResourceSet.INSTANCE);
+            event.registerReloadListener(BedrockAnimationResources.INSTANCE);
+            event.registerReloadListener(BedrockModelResources.INSTANCE);
             event.registerReloadListener(ParticleDefinitionLoader.getInstance());
         }
     }
@@ -59,8 +70,16 @@ public class ReloadListenersRegister {
             BedrockAnimationResourceSet.INSTANCE = new BedrockAnimationResourceSet(event3.getAnimationRegistry(), event4.getListeners());
 
 
+            RegisterV2BedrockResourcesEvent event5 = new RegisterV2BedrockResourcesEvent(Dist.DEDICATED_SERVER);
+            ModLoader.get().postEvent(event5);
+            BedrockAnimationResources.INSTANCE = new BedrockAnimationResources(event5.getAnimationRegistry());
+            BedrockModelResources.INSTANCE = new BedrockModelResources(event5.getModelRegistry(), event5.getReloadListeners());
+
+
             event.addListener(BedrockModelResourceSet.INSTANCE);
             event.addListener(BedrockAnimationResourceSet.INSTANCE);
+            event.addListener(BedrockAnimationResources.INSTANCE);
+            event.addListener(BedrockModelResources.INSTANCE);
         }
     }
 }

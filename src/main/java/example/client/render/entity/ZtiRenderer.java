@@ -2,14 +2,13 @@ package example.client.render.entity;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.GsonUtil;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneDefinition;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import com.google.common.base.Suppliers;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
 import com.maydaymemory.mae.basic.Pose;
@@ -20,7 +19,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import example.animation.ZtiAnimationContext;
 import example.entity.Zti;
-import net.minecraft.client.Minecraft;
+import example.resource.KnownResources;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -30,16 +29,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 public class ZtiRenderer extends EntityRenderer<Zti> {
     public static final ResourceLocation TEXTURE = new ResourceLocation("example", "textures/entity/zti.png");
-
-    private static final ResourceLocation MODEL_PATH = new ResourceLocation("example", "models/bedrock/zti.geo.json");
-    private static final ResourceLocation ANIM_PATH = new ResourceLocation("example", "animations/zti.animation.json");
 
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
@@ -53,38 +47,23 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
     }
 
     private BakedBedrockModel loadModel() {
-        try {
-            BedrockModelPOJO modelPOJO;
-            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(MODEL_PATH);
-                 InputStreamReader reader = new InputStreamReader(stream)) {
-                modelPOJO = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockModelPOJO.class);
-            }
-
-            BedrockAnimationFile animationFile;
-            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(ANIM_PATH);
-                 InputStreamReader reader = new InputStreamReader(stream)) {
-                animationFile = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockAnimationFile.class);
-            }
-
-            BakerOptions options = BakerOptions.ofAnimationFile(animationFile);
-            BakedBedrockModel model = BakedBedrockModel.bake(modelPOJO, options);
-
-            // 使用 v2 模型的骨骼索引初始化动画，替代 v1 的 RegisterBedrockAnimationReloadListenerEvent 流程
-            ZtiAnimationContext.initialize(animationFile, model);
-
-            SimpleBedrockModel.LOGGER.info("Loaded v2 ZTI model: bones={}, cubeChunks={}, meshChunks={}, animatedBones={}",
-                    model.bones().length, model.cubeChunks().length, model.meshChunks().length,
-                    options.animatedBones().size());
-
-            // 调试日志：打印骨骼层级与几何体分布
-            logBoneHierarchy(model);
-            // 调试日志：打印 mesh chunk 的顶点包围盒
-            logMeshChunkBounds(model);
-            return model;
-        } catch (Exception e) {
-            SimpleBedrockModel.LOGGER.error("Failed to load v2 ZTI model", e);
+        BakedBedrockModel model = BedrockModelResources.getInstance().getModel(KnownResources.ZTI_MODEL);
+        BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.ZTI_ANIMATION);
+        if (model == null || animationFile == null) {
             return null;
         }
+
+        // 使用 v2 模型的骨骼索引初始化动画，替代 v1 的 RegisterBedrockAnimationReloadListenerEvent 流程
+        ZtiAnimationContext.initialize(animationFile, model);
+
+        SimpleBedrockModel.LOGGER.info("Loaded v2 ZTI model: bones={}, cubeChunks={}, meshChunks={}",
+                model.bones().length, model.cubeChunks().length, model.meshChunks().length);
+
+        // 调试日志：打印骨骼层级与几何体分布
+        logBoneHierarchy(model);
+        // 调试日志：打印 mesh chunk 的顶点包围盒
+        logMeshChunkBounds(model);
+        return model;
     }
 
     @Override

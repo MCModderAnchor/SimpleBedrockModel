@@ -39,6 +39,17 @@ public class RawResourceLoaders {
         }
     };
 
+    public static final RawResourceLoader FULL_LOADER = new RawResourceLoader() {
+        @Override
+        public <T> T load(InputStream inputStream, Class<T> clazz) {
+            try (InputStreamReader reader = new InputStreamReader(inputStream)) {
+                return GsonUtil.CLIENT_GSON.fromJson(reader, clazz);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    };
+
     public static final RawResourceLoader ROOT_MOTION_READY_LOADER = new RawResourceLoader() {
         @Override
         public <T> T load(InputStream inputStream, Class<T> clazz) {

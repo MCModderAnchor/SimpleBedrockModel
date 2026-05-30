@@ -1,13 +1,11 @@
 package example.client.render.blockentity;
 
-import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.GsonUtil;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockModelInstance;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import com.google.common.base.Suppliers;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
 import com.maydaymemory.mae.basic.Pose;
@@ -20,7 +18,7 @@ import example.animation.TestBlockAnimationContext;
 import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
-import net.minecraft.client.Minecraft;
+import example.resource.KnownResources;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -31,15 +29,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockEntity> {
     private static final ResourceLocation TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/test.png");
     private static final ResourceLocation POLY_MESH_TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/vct.png");
-    private static final ResourceLocation TEST_ANIM_PATH = ExampleModRegister.modLoc("animations/test.json");
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
     private final Supplier<BakedBedrockModel> testModelSupplier;
@@ -53,51 +48,16 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
     }
 
     private BakedBedrockModel loadTestModel() {
-        try {
-            BedrockModelPOJO modelPOJO;
-            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(ExampleModRegister.modLoc("models/bedrock/test.json"));
-                 InputStreamReader reader = new InputStreamReader(stream)) {
-                modelPOJO = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockModelPOJO.class);
-            }
-
-            BedrockAnimationFile animationFile;
-            try (InputStream stream = Minecraft.getInstance().getResourceManager().open(TEST_ANIM_PATH);
-                 InputStreamReader reader = new InputStreamReader(stream)) {
-                animationFile = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockAnimationFile.class);
-            }
-
-            BakerOptions options = BakerOptions.ofAnimationFile(animationFile);
-            BakedBedrockModel model = BakedBedrockModel.bake(modelPOJO, options);
-
-            // 使用 v2 模型的骨骼索引初始化动画
+        BakedBedrockModel model = BedrockModelResources.getInstance().getModel(KnownResources.TEST);
+        BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.TEST);
+        if (model != null && animationFile != null) {
             TestBlockAnimationContext.initialize(animationFile, model);
-
-            SimpleBedrockModel.LOGGER.info("Loaded v2 test model: bones={}, cubeChunks={}, meshChunks={}, animatedBones={}",
-                    model.bones().length, model.cubeChunks().length, model.meshChunks().length,
-                    options.animatedBones().size());
-            return model;
-        } catch (Exception e) {
-            SimpleBedrockModel.LOGGER.error("Failed to load v2 test model", e);
-            return null;
         }
+        return model;
     }
 
     private BakedBedrockModel loadPolyMeshTestModel() {
-        return loadModel(ExampleModRegister.modLoc("models/bedrock/vct.geo.json"), BakerOptions.defaults(), "poly mesh test");
-    }
-
-    private BakedBedrockModel loadModel(ResourceLocation path, BakerOptions options, String name) {
-        try (InputStream stream = Minecraft.getInstance().getResourceManager().open(path);
-             InputStreamReader reader = new InputStreamReader(stream)) {
-            BedrockModelPOJO pojo = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockModelPOJO.class);
-            BakedBedrockModel model = BakedBedrockModel.bake(pojo, options);
-            SimpleBedrockModel.LOGGER.info("Loaded v2 {} model: bones={}, cubeChunks={}, meshChunks={}",
-                    name, model.bones().length, model.cubeChunks().length, model.meshChunks().length);
-            return model;
-        } catch (Exception e) {
-            SimpleBedrockModel.LOGGER.error("Failed to load v2 {} model: {}", name, path, e);
-            return null;
-        }
+        return BedrockModelResources.getInstance().getModel(KnownResources.POLY_MESH_TEST);
     }
 
     @Override
