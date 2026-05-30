@@ -250,6 +250,6 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
     }
 
     private static ResourceLocation modelPath(ResourceLocation location) {
-        return new ResourceLocation(location.getNamespace(), "models/bedrock/" + location.getPath() + ".json");
+        return ResourceLocation.fromNamespaceAndPath(location.getNamespace(), "models/bedrock/" + location.getPath() + ".json");
     }
 }

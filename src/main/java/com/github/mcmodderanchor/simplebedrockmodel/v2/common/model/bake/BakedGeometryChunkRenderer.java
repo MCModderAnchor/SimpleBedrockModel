@@ -6,6 +6,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
+import net.minecraft.util.FastColor;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
@@ -80,6 +81,7 @@ public class BakedGeometryChunkRenderer {
         float[] positions = vertices.positions();
         float[] normals = vertices.normals();
         float[] uvs = vertices.uvs();
+        int color = packColor(red, green, blue, alpha);
         for (int i = 0; i < vertices.vertexCount(); i++) {
             int pb = i * BakedVertexData.POSITION_STRIDE;
             int nb = i * BakedVertexData.NORMAL_STRIDE;
@@ -89,7 +91,7 @@ public class BakedGeometryChunkRenderer {
             if (renderNormal.lengthSquared() > 1.0E-12f) {
                 renderNormal.normalize();
             }
-            consumer.vertex(renderPosition.x, renderPosition.y, renderPosition.z, red, green, blue, alpha, uvs[ub], uvs[ub + 1], overlay, lightmap,
+            consumer.addVertex(renderPosition.x, renderPosition.y, renderPosition.z, color, uvs[ub], uvs[ub + 1], overlay, lightmap,
                     renderNormal.x, renderNormal.y, renderNormal.z);
         }
     }
@@ -97,7 +99,17 @@ public class BakedGeometryChunkRenderer {
     private void emitVertex(VertexConsumer consumer, Matrix4f poseMatrix, float red, float green, float blue, float alpha,
                             float x, float y, float z, float u, float v, int overlay, int lightmap, float nx, float ny, float nz) {
         renderPosition.set(x, y, z).mulPosition(poseMatrix);
-        consumer.vertex(renderPosition.x, renderPosition.y, renderPosition.z, red, green, blue, alpha, u, v, overlay, lightmap, nx, ny, nz);
+        int color = packColor(red, green, blue, alpha);
+        consumer.addVertex(renderPosition.x, renderPosition.y, renderPosition.z, color, u, v, overlay, lightmap, nx, ny, nz);
+    }
+
+    private int packColor(float red, float green, float blue, float alpha) {
+        return FastColor.ARGB32.color(
+                (int) (alpha * 255.0f),
+                (int) (red * 255.0f),
+                (int) (green * 255.0f),
+                (int) (blue * 255.0f)
+        );
     }
 
     private boolean shouldCullQuad(float[] positions, int positionBase, Matrix4f poseMatrix, float nx, float ny, float nz) {

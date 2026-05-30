@@ -5,6 +5,8 @@ import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.*;
@@ -15,6 +17,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -63,23 +66,23 @@ public class TestBlock extends HorizontalDirectionalBlock implements EntityBlock
         return new TestBlockEntity(blockPos, blockState);
     }
 
-//    @Override
-//    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
-//        if (pLevel.isClientSide) {
-//            BlockEntity pBlockEntity = pLevel.getBlockEntity(pPos);
-//            if (pBlockEntity instanceof TestBlockEntity blockEntity) {
-//                pBlockEntity.setChanged();
-//            }
-//            return InteractionResult.SUCCESS;
-//        } else {
-//            BlockEntity pBlockEntity = pLevel.getBlockEntity(pPos);
-//            if (pBlockEntity instanceof TestBlockEntity blockEntity) {
-//                blockEntity.getAnimationInstance().triggerTransition();
-//                blockEntity.replicateAnimationInstance();
-//            }
-//            return InteractionResult.CONSUME;
-//        }
-//    }
+    @Override
+    protected InteractionResult useWithoutItem(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, BlockHitResult pHit) {
+        if (pLevel.isClientSide) {
+            BlockEntity pBlockEntity = pLevel.getBlockEntity(pPos);
+            if (pBlockEntity instanceof TestBlockEntity blockEntity) {
+                blockEntity.setChanged();
+            }
+            return InteractionResult.SUCCESS;
+        } else {
+            BlockEntity pBlockEntity = pLevel.getBlockEntity(pPos);
+            if (pBlockEntity instanceof TestBlockEntity blockEntity) {
+                blockEntity.getAnimationInstance().triggerTransition();
+                blockEntity.replicateAnimationInstance();
+            }
+            return InteractionResult.CONSUME;
+        }
+    }
 
     @Nullable
     @SuppressWarnings("unchecked")

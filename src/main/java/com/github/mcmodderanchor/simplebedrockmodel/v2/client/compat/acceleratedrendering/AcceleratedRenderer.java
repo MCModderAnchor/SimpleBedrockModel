@@ -86,6 +86,7 @@ public final class AcceleratedRenderer {
         float[] positions = quads.positions();
         float[] normals = quads.normals();
         float[] uvs = quads.uvs();
+        int color = FastColor.ARGB32.color(255, 255, 255, 255);
         for (int i = 0; i < quads.quadCount(); i++) {
             int pb = i * BakedQuadData.POSITION_STRIDE;
             int nb = i * BakedQuadData.NORMAL_STRIDE;
@@ -93,10 +94,10 @@ public final class AcceleratedRenderer {
             float nx = normals[nb];
             float ny = normals[nb + 1];
             float nz = normals[nb + 2];
-            builder.vertex(positions[pb], positions[pb + 1], positions[pb + 2], 1.0f, 1.0f, 1.0f, 1.0f, uvs[ub], uvs[ub + 1], 0, 0, nx, ny, nz);
-            builder.vertex(positions[pb + 3], positions[pb + 4], positions[pb + 5], 1.0f, 1.0f, 1.0f, 1.0f, uvs[ub + 2], uvs[ub + 3], 0, 0, nx, ny, nz);
-            builder.vertex(positions[pb + 6], positions[pb + 7], positions[pb + 8], 1.0f, 1.0f, 1.0f, 1.0f, uvs[ub + 4], uvs[ub + 5], 0, 0, nx, ny, nz);
-            builder.vertex(positions[pb + 9], positions[pb + 10], positions[pb + 11], 1.0f, 1.0f, 1.0f, 1.0f, uvs[ub + 6], uvs[ub + 7], 0, 0, nx, ny, nz);
+            builder.addVertex(positions[pb], positions[pb + 1], positions[pb + 2], color, uvs[ub], uvs[ub + 1], 0, 0, nx, ny, nz);
+            builder.addVertex(positions[pb + 3], positions[pb + 4], positions[pb + 5], color, uvs[ub + 2], uvs[ub + 3], 0, 0, nx, ny, nz);
+            builder.addVertex(positions[pb + 6], positions[pb + 7], positions[pb + 8], color, uvs[ub + 4], uvs[ub + 5], 0, 0, nx, ny, nz);
+            builder.addVertex(positions[pb + 9], positions[pb + 10], positions[pb + 11], color, uvs[ub + 6], uvs[ub + 7], 0, 0, nx, ny, nz);
         }
     }
 
@@ -104,11 +105,12 @@ public final class AcceleratedRenderer {
         float[] positions = vertices.positions();
         float[] normals = vertices.normals();
         float[] uvs = vertices.uvs();
+        int color = FastColor.ARGB32.color(255, 255, 255, 255);
         for (int i = 0; i < vertices.vertexCount(); i++) {
             int pb = i * BakedVertexData.POSITION_STRIDE;
             int nb = i * BakedVertexData.NORMAL_STRIDE;
             int ub = i * BakedVertexData.UV_STRIDE;
-            builder.vertex(positions[pb], positions[pb + 1], positions[pb + 2], 1.0f, 1.0f, 1.0f, 1.0f, uvs[ub], uvs[ub + 1], 0, 0, normals[nb], normals[nb + 1], normals[nb + 2]);
+            builder.addVertex(positions[pb], positions[pb + 1], positions[pb + 2], color, uvs[ub], uvs[ub + 1], 0, 0, normals[nb], normals[nb + 1], normals[nb + 2]);
         }
     }
 

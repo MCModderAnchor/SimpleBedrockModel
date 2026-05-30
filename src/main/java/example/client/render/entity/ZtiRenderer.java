@@ -33,7 +33,7 @@ import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 public class ZtiRenderer extends EntityRenderer<Zti> {
-    public static final ResourceLocation TEXTURE = new ResourceLocation("example", "textures/entity/zti.png");
+    public static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("example", "textures/entity/zti.png");
 
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 

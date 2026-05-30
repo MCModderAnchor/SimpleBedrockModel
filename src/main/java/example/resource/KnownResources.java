@@ -20,13 +20,13 @@ public class KnownResources {
     public static final ArrayList<ResourceLocation> ANIMATION_AND_MODEL = new ArrayList<>();
     public static final ArrayList<ResourceLocation> MODEL = new ArrayList<>();
 
-    public static final ResourceLocation TEST = new ResourceLocation(ExampleModRegister.MOD_ID, "test");
-    public static final ResourceLocation DEAGLE = registerAnimationAndModel(new ResourceLocation(ExampleModRegister.MOD_ID, "deagle"));
-    public static final ResourceLocation POLY_MESH_TEST = registerModel(new ResourceLocation(ExampleModRegister.MOD_ID, "vct.geo"));
-    public static final ResourceLocation ZTI_MODEL = new ResourceLocation(ExampleModRegister.MOD_ID, "zti.geo");
-    public static final ResourceLocation ZTI_ANIMATION = new ResourceLocation(ExampleModRegister.MOD_ID, "zti.animation");
+    public static final ResourceLocation TEST = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "test");
+    public static final ResourceLocation DEAGLE = registerAnimationAndModel(ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "deagle"));
+    public static final ResourceLocation POLY_MESH_TEST = registerModel(ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "vct.geo"));
+    public static final ResourceLocation ZTI_MODEL = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "zti.geo");
+    public static final ResourceLocation ZTI_ANIMATION = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "zti.animation");
     // Molang 测试动画，复用 TEST 的模型
-    public static final ResourceLocation MOLANG_TEST = new ResourceLocation(ExampleModRegister.MOD_ID, "molang_test");
+    public static final ResourceLocation MOLANG_TEST = ResourceLocation.fromNamespaceAndPath(ExampleModRegister.MOD_ID, "molang_test");
 
     private static ResourceLocation registerAnimationAndModel(ResourceLocation location) {
         ANIMATION_AND_MODEL.add(location);

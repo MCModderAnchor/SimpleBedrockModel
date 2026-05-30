@@ -112,6 +112,6 @@ public class BedrockAnimationResources extends SimplePreparableReloadListener<Ma
     }
 
     private static ResourceLocation animationPath(ResourceLocation location) {
-        return new ResourceLocation(location.getNamespace(), "animations/" + location.getPath() + ".json");
+        return ResourceLocation.fromNamespaceAndPath(location.getNamespace(), "animations/" + location.getPath() + ".json");
     }
 }

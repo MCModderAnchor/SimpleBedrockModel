@@ -8,6 +8,9 @@ import example.animation.MolangTestAnimationContext;
 import example.animation.TestBlockAnimationInstance;
 import example.init.ExampleModRegister;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -61,29 +64,29 @@ public class TestBlockEntity extends BlockEntity {
         }
     }
     @Override
-    public @NotNull CompoundTag getUpdateTag() {
-        CompoundTag tag = super.getUpdateTag();
+    public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
+        CompoundTag tag = super.getUpdateTag(registries);
         tag.put("AnimationInstance", animationInstance.getUpdateTag());
         return tag;
     }
 
     @Override
-    public void handleUpdateTag(CompoundTag tag) {
-        super.handleUpdateTag(tag);
+    public void handleUpdateTag(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider lookupProvider) {
+        super.handleUpdateTag(tag, lookupProvider);
         animationInstance.handleUpdateTag(tag.getCompound("AnimationInstance"));
     }
 
     @Override
-    public void onDataPacket(Connection net, ClientboundBlockEntityDataPacket pkt) {
-        super.onDataPacket(net, pkt);
+    public @NotNull ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void onDataPacket(@NotNull Connection net, @NotNull ClientboundBlockEntityDataPacket pkt, HolderLookup.@NotNull Provider lookupProvider) {
+        super.onDataPacket(net, pkt, lookupProvider);
         CompoundTag tag = pkt.getTag();
         if (tag != null) {
             animationInstance.handleUpdateTag(tag.getCompound("AnimationInstance"));
         }
-    }
-
-    @Override
-    public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

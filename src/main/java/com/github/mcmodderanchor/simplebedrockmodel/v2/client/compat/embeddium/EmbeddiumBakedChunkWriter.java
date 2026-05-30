@@ -1,21 +1,20 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.embeddium;
 
-
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.ISodiumVertexWriter;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.IEmbeddiumVertexWriter;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium.ChunkVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedQuadData;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedVertexData;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
+import org.embeddedt.embeddium.api.vertex.buffer.VertexBufferWriter;
+import org.embeddedt.embeddium.impl.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
-public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexWriter {
+public class EmbeddiumBakedChunkWriter implements IEmbeddiumVertexWriter, ChunkVertexWriter {
     private static final int MAX_VERTICES_PER_BATCH = 256;
     private static final long SCRATCH = MemoryUtil.nmemAlignedAlloc(64, (long) MAX_VERTICES_PER_BATCH * STRIDE);
 
@@ -148,12 +147,5 @@ public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexW
         float ty = p01 * cx + p11 * cy + p21 * cz + p31 + p31;
         float tz = p02 * cx + p12 * cy + p22 * cz + p32 + p32;
         return tx * nx + ty * ny + tz * nz > 0;
-    }
-
-    @Override
-    public void flush(VertexBufferWriter writer, int vertexCount) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            writer.push(stack, SCRATCH, vertexCount, EntityVertex.FORMAT);
-        }
     }
 }

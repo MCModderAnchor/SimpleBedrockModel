@@ -54,6 +54,7 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
+            sourceSet(sourceSets.test)
         }
     }
 }
@@ -73,6 +74,10 @@ configurations {
     additionalRuntimeClasspath {
         extendsFrom mcLib
     }
+
+    // 让测试编译期能访问 Minecraft / NeoForge 等主模块的编译依赖
+    testCompileClasspath.extendsFrom compileClasspath
+    testRuntimeClasspath.extendsFrom runtimeClasspath
 }
 
 repositories {
@@ -97,13 +102,13 @@ repositories {
 dependencies {
     implementation "maven.modrinth:sodium:mc1.21-0.6.0-beta.2-neoforge"
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
-    mcLib jarJar("com.maydaymemory:mae:1.1.2") {
+    mcLib jarJar("com.maydaymemory:mae:1.1.3") {
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
         exclude group: 'it.unimi.dsi', module: 'fastutil'
         exclude group: 'org.joml', module: 'joml'
     }
 
-    implementation "maven.modrinth:acceleratedrendering:1.0.8-1.21.1-alpha"
+    implementation "maven.modrinth:acceleratedrendering:1.0.9-1.21.1-alpha"
     api 'org.ow2.asm:asm:9.8'
     runtimeOnly "curse.maven:configured-457570:7276577"
 
@@ -114,6 +119,7 @@ dependencies {
     // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+    testImplementation "org.joml:joml:1.10.5"
 
     // JMH: mocha 原版 (javassist) 用于性能对比
     jmhImplementation 'team.unnamed:mocha:3.0.1'
