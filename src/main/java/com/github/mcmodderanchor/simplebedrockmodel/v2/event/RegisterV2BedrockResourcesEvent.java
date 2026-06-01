@@ -69,6 +69,7 @@ public class RegisterV2BedrockResourcesEvent extends Event implements IModBusEve
         private final LinkedHashMap<ResourceLocation, AnimationRegistration> animations = new LinkedHashMap<>();
         private Function<BedrockModelBakeContext, BakerOptions> optionsFactory;
         private boolean lazy;
+        private boolean preserveLegacyArmorCopy;
 
         private ModelBuilder(ResourceLocation modelId, RawResourceLoader modelLoader) {
             this.modelId = modelId;
@@ -77,6 +78,15 @@ public class RegisterV2BedrockResourcesEvent extends Event implements IModBusEve
 
         public ModelBuilder lazy() {
             this.lazy = true;
+            return this;
+        }
+
+        /**
+         * Marks this v2 model as needing a legacy v1 armor-model copy for Epic Fight conversion.
+         * The copy is created only when Epic Fight is actually installed and the model resource is built.
+         */
+        public ModelBuilder preserveLegacyArmorCopyForEpicFight() {
+            this.preserveLegacyArmorCopy = true;
             return this;
         }
 
@@ -106,7 +116,7 @@ public class RegisterV2BedrockResourcesEvent extends Event implements IModBusEve
             Function<BedrockModelBakeContext, BakerOptions> factory = optionsFactory != null
                     ? optionsFactory
                     : context -> animations.isEmpty() ? BakerOptions.defaults() : context.optionsFromAnimations();
-            modelRegistry.put(modelId, new BedrockModelEntry(modelLoader, factory, new ArrayList<>(animations.keySet()), lazy));
+            modelRegistry.put(modelId, new BedrockModelEntry(modelLoader, factory, new ArrayList<>(animations.keySet()), lazy, preserveLegacyArmorCopy));
             for (Map.Entry<ResourceLocation, AnimationRegistration> entry : animations.entrySet()) {
                 AnimationRegistration animation = entry.getValue();
                 animationRegistry.put(entry.getKey(), new BedrockAnimationEntry(

@@ -1,10 +1,10 @@
 package example.item;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.GeoArmorRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.BedrockModelResourceSet;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer.GeoArmorRendererV2;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import example.resource.InnerResourceLoader;
-import example.resource.KnownResources;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -27,13 +27,18 @@ public class ExampleArmorItem extends ArmorItem {
     @Override
     public void initializeClient(Consumer<IClientItemExtensions> consumer) {
         consumer.accept(new IClientItemExtensions() {
-            private GeoArmorRenderer renderer;
+            private GeoArmorRendererV2 renderer;
 
             @Override
             public @NotNull HumanoidModel<?> getHumanoidArmorModel(LivingEntity livingEntity, ItemStack itemStack, EquipmentSlot equipmentSlot, HumanoidModel<?> original) {
                 if (this.renderer == null) {
-                    this.renderer = new GeoArmorRenderer(
-                            InnerResourceLoader.DEFENDER_MODEL,
+                    BedrockModelResources resources = BedrockModelResources.getInstance();
+                    BakedBedrockModel model = resources.getModel(InnerResourceLoader.DEFENDER);
+                    BedrockArmorModel legacyArmorModel = resources.getLegacyArmorCopyForEpicFight(InnerResourceLoader.DEFENDER);
+                    this.renderer = new GeoArmorRendererV2(
+                            model,
+                            ExampleArmorItem.this.getEquipmentSlot(),
+                            legacyArmorModel,
                             new ResourceLocation("example", "textures/armor/defender.png")
                     );
                 }

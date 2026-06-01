@@ -76,8 +76,14 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
             return null;
         }
 
-        BedrockArmorModel model = geoArmor.getModel();
+        return transformArmorModel(geoArmor.getModel(), geoArmor.getEquipmentSlot());
+    }
 
+    public static SkinnedMesh transformArmorModel(BedrockArmorModel model) {
+        return transformArmorModel(model, null);
+    }
+
+    public static SkinnedMesh transformArmorModel(BedrockArmorModel model, @Nullable net.minecraft.world.entity.EquipmentSlot equipmentSlot) {
         // Reset to bind pose to get default bone transforms
         model.applyPose(model.getBindPose());
 
@@ -101,14 +107,22 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         resetRotation(leftBootBone);
 
         List<BedrockModelPartition> partitions = Lists.newArrayList();
-        partitions.add(new BedrockModelPartition(HEAD, headBone));
-        partitions.add(new BedrockModelPartition(CHEST, bodyBone));
-        partitions.add(new BedrockModelPartition(RIGHT_ARM, rightArmBone));
-        partitions.add(new BedrockModelPartition(LEFT_ARM, leftArmBone));
-        partitions.add(new BedrockModelPartition(LEFT_LEG, leftLegBone));
-        partitions.add(new BedrockModelPartition(RIGHT_LEG, rightLegBone));
-        partitions.add(new BedrockModelPartition(LEFT_FEET, leftBootBone));
-        partitions.add(new BedrockModelPartition(RIGHT_FEET, rightBootBone));
+        if (equipmentSlot == null || equipmentSlot == net.minecraft.world.entity.EquipmentSlot.HEAD) {
+            partitions.add(new BedrockModelPartition(HEAD, headBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == net.minecraft.world.entity.EquipmentSlot.CHEST) {
+            partitions.add(new BedrockModelPartition(CHEST, bodyBone));
+            partitions.add(new BedrockModelPartition(RIGHT_ARM, rightArmBone));
+            partitions.add(new BedrockModelPartition(LEFT_ARM, leftArmBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == net.minecraft.world.entity.EquipmentSlot.LEGS) {
+            partitions.add(new BedrockModelPartition(LEFT_LEG, leftLegBone));
+            partitions.add(new BedrockModelPartition(RIGHT_LEG, rightLegBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == net.minecraft.world.entity.EquipmentSlot.FEET) {
+            partitions.add(new BedrockModelPartition(LEFT_FEET, leftBootBone));
+            partitions.add(new BedrockModelPartition(RIGHT_FEET, rightBootBone));
+        }
 
         return bakeMeshFromBones(partitions);
     }

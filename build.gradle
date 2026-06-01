@@ -130,7 +130,7 @@ dependencies {
     runtimeOnly fg.deobf("curse.maven:configured-457570:5180900")
 
     // 测试用mod
-    compileOnly fg.deobf("curse.maven:epic-fight-mod-405076:7316952")
+    implementation fg.deobf("curse.maven:epic-fight-mod-405076:7316952")
     runtimeOnly fg.deobf("curse.maven:playeranimator-658587:4587214")
 //    runtimeOnly fg.deobf("curse.maven:timeless-and-classics-zero-1028108:8055552-sources-8055584")
 //

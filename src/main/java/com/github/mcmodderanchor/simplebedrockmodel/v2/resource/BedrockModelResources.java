@@ -1,6 +1,8 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.resource;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.epicfight.EpicFightCompat;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
@@ -31,6 +33,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
     private final List<Consumer<Map<ResourceLocation, BedrockModelResource>>> listeners;
     private final Map<ResourceLocation, Optional<BedrockModelPOJO>> pojoCache;
     private final Map<ResourceLocation, Optional<BedrockModelResource>> resourceCache;
+    private final Map<ResourceLocation, Optional<BedrockArmorModel>> legacyArmorCache;
     @Nullable
     private ResourceManager resourceManager;
 
@@ -46,6 +49,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         this.listeners = List.copyOf(listeners);
         this.pojoCache = Maps.newHashMap();
         this.resourceCache = Maps.newHashMap();
+        this.legacyArmorCache = Maps.newHashMap();
     }
 
     @Override
@@ -68,6 +72,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         this.resourceManager = resourceManager;
         pojoCache.clear();
         resourceCache.clear();
+        legacyArmorCache.clear();
         pojoCache.putAll(prepared);
         processors.forEach((location, processor) -> {
             if (processor.lazy()) {
@@ -77,6 +82,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
             if (pojo == null || pojo.isEmpty()) {
                 return;
             }
+            createLegacyArmorCopyIfEnabled(location, processor, pojo.get());
             resourceCache.put(location, createResource(location, processor, pojo.get()));
         });
         Map<ResourceLocation, BedrockModelResource> resources = getAllResources();
@@ -101,6 +107,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
             resourceCache.put(location, Optional.empty());
             return null;
         }
+        createLegacyArmorCopyIfEnabled(location, processor, pojo);
         Optional<BedrockModelResource> resource = createResource(location, processor, pojo);
         resourceCache.put(location, resource);
         return resource.orElse(null);
@@ -138,14 +145,34 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         return pojo.orElse(null);
     }
 
+    @Nullable
+    public synchronized BedrockArmorModel getLegacyArmorCopyForEpicFight(ResourceLocation location) {
+        Optional<BedrockArmorModel> cached = legacyArmorCache.get(location);
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+        BedrockModelEntry processor = processors.get(location);
+        if (processor == null || !processor.preserveLegacyArmorCopy()) {
+            return null;
+        }
+        BedrockModelPOJO pojo = getModelPojo(location);
+        if (pojo == null) {
+            legacyArmorCache.put(location, Optional.empty());
+            return null;
+        }
+        return createLegacyArmorCopyIfEnabled(location, processor, pojo);
+    }
+
     public synchronized void clearLoaded(ResourceLocation location) {
         pojoCache.remove(location);
         resourceCache.remove(location);
+        legacyArmorCache.remove(location);
     }
 
     public synchronized void clearLoaded() {
         pojoCache.clear();
         resourceCache.clear();
+        legacyArmorCache.clear();
     }
 
     @UnmodifiableView
@@ -169,6 +196,26 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
     @UnmodifiableView
     public Map<ResourceLocation, Optional<BedrockModelPOJO>> getAllModelPojos() {
         return Collections.unmodifiableMap(pojoCache);
+    }
+
+    @Nullable
+    private BedrockArmorModel createLegacyArmorCopyIfEnabled(ResourceLocation location, BedrockModelEntry processor, BedrockModelPOJO pojo) {
+        if (!processor.preserveLegacyArmorCopy() || !EpicFightCompat.isLoaded()) {
+            return null;
+        }
+        Optional<BedrockArmorModel> cached = legacyArmorCache.get(location);
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+        try {
+            BedrockArmorModel legacyArmor = new BedrockArmorModel(pojo);
+            legacyArmorCache.put(location, Optional.of(legacyArmor));
+            return legacyArmor;
+        } catch (RuntimeException e) {
+            SimpleBedrockModel.LOGGER.error("Failed to create v1 armor copy for Epic Fight: {}", location, e);
+            legacyArmorCache.put(location, Optional.empty());
+            return null;
+        }
     }
 
     private Optional<BedrockModelResource> createResource(ResourceLocation location, BedrockModelEntry processor, BedrockModelPOJO pojo) {

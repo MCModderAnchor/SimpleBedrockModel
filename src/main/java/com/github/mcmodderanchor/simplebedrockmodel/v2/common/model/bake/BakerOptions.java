@@ -17,6 +17,18 @@ public record BakerOptions(
         boolean bakeStaticGeometry,
         boolean debugFoldedTree
 ) {
+    public static final Set<String> ARMOR_BONES = Set.of(
+            "armorHead",
+            "armorBody",
+            "armorRightArm",
+            "armorLeftArm",
+            "armorRightLeg",
+            "armorLeftLeg",
+            "armorRightBoot",
+            "armorLeftBoot"
+    );
+    public static final BakerOptions ARMOR = new BakerOptions(Set.of(), ARMOR_BONES, true, false);
+
     public BakerOptions {
         animatedBones = Set.copyOf(animatedBones);
         preservedBones = Set.copyOf(preservedBones);

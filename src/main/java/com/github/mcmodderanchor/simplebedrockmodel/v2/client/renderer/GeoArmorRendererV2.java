@@ -1,14 +1,14 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockArmorInstance;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
@@ -18,9 +18,12 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-// 说是模型，实际上是一个适配器，用来敷衍原版的）
-public class GeoArmorRenderer extends HumanoidModel {
-    protected final BedrockArmorModel model;
+public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> {
+    protected final BakedBedrockModel model;
+    protected final BedrockArmorInstance instance;
+    private final EquipmentSlot armorSlot;
+    @Nullable
+    private final BedrockArmorModel legacyArmorModelForEpicFight;
     private final ResourceLocation texture;
 
     @Nullable
@@ -32,25 +35,31 @@ public class GeoArmorRenderer extends HumanoidModel {
     @Nullable
     protected HumanoidModel<?> original;
 
-    public GeoArmorRenderer(BedrockArmorModel origin, ResourceLocation texture) {
+    public GeoArmorRendererV2(BakedBedrockModel model, EquipmentSlot armorSlot, ResourceLocation texture) {
+        this(model, new BedrockArmorInstance(model), armorSlot, null, texture);
+    }
+
+    public GeoArmorRendererV2(BakedBedrockModel model, EquipmentSlot armorSlot,
+                              BedrockArmorModel legacyArmorModelForEpicFight, ResourceLocation texture) {
+        this(model, new BedrockArmorInstance(model), armorSlot, legacyArmorModelForEpicFight, texture);
+    }
+
+    public GeoArmorRendererV2(BakedBedrockModel model, BedrockArmorInstance instance, EquipmentSlot armorSlot, ResourceLocation texture) {
+        this(model, instance, armorSlot, null, texture);
+    }
+
+    public GeoArmorRendererV2(BakedBedrockModel model, BedrockArmorInstance instance, EquipmentSlot armorSlot,
+                              @Nullable BedrockArmorModel legacyArmorModelForEpicFight, ResourceLocation texture) {
         super(Minecraft.getInstance().getEntityModels().bakeLayer(ModelLayers.PLAYER_INNER_ARMOR));
-        this.model = origin;
+        this.armorSlot = armorSlot;
+        this.legacyArmorModelForEpicFight = legacyArmorModelForEpicFight;
+        this.model = model;
+        this.instance = instance;
         this.texture = texture;
     }
 
     public void preparePose(LivingEntity livingEntity, ItemStack itemStack, EquipmentSlot equipmentSlot, HumanoidModel<?> original) {
-        model.applyPose(model.getBindPose());
-
-        copyModelPart(original.head, model.getArmorHead(), 0, 24, 0);
-        copyModelPart(original.body, model.getArmorBody(), 0, 24, 0);
-        copyModelPart(original.rightArm, model.getArmorRightArm(), 5, 22, 0);
-        copyModelPart(original.leftArm, model.getArmorLeftArm(), -5, 22, 0);
-        copyModelPart(original.rightLeg, model.getArmorRightLeg(), 1.9f, 12, 0);
-        copyModelPart(original.leftLeg, model.getArmorLeftLeg(), -1.9f, 12, 0);
-        copyModelPart(original.rightLeg, model.getArmorRightBoot(), 1.9f, 12, 0);
-        copyModelPart(original.leftLeg, model.getArmorLeftBoot(), -1.9f, 12, 0);
-
-        setVisibilityBySlot(equipmentSlot);
+        this.instance.preparePose(livingEntity, itemStack, equipmentSlot, original);
 
         this.livingEntity = livingEntity;
         this.itemStack = itemStack;
@@ -58,58 +67,21 @@ public class GeoArmorRenderer extends HumanoidModel {
         this.original = original;
     }
 
-    public void copyModelPart(ModelPart part, BedrockBone bone, float initX, float initY, float initZ) {
-        if (bone != null) {
-            float deltaX = part.x - initX;
-            float deltaY = part.y - initY;
-            float deltaZ = part.z - initZ;
-
-            bone.x += deltaX;
-            bone.y += deltaY;
-            bone.z += deltaZ;
-
-            bone.rotation.rotationZYX(part.zRot, part.yRot, part.xRot);
-
-            bone.xScale = -part.xScale;
-            bone.yScale = -part.yScale;
-            bone.zScale = part.zScale;
-            bone.visible = part.visible;
-        }
-    }
-
-    public void setVisibilityBySlot(EquipmentSlot slot) {
-        setBoneVisible(model.getArmorHead(), slot == EquipmentSlot.HEAD);
-        setBoneVisible(model.getArmorBody(), slot == EquipmentSlot.CHEST);
-        setBoneVisible(model.getArmorRightArm(), slot == EquipmentSlot.CHEST);
-        setBoneVisible(model.getArmorLeftArm(), slot == EquipmentSlot.CHEST);
-        setBoneVisible(model.getArmorRightLeg(), slot == EquipmentSlot.LEGS);
-        setBoneVisible(model.getArmorLeftLeg(), slot == EquipmentSlot.LEGS);
-        setBoneVisible(model.getArmorRightBoot(), slot == EquipmentSlot.FEET);
-        setBoneVisible(model.getArmorLeftBoot(), slot == EquipmentSlot.FEET);
-    }
-
-    public void setBoneVisible(BedrockBone bone, boolean visible) {
-        if (bone != null) {
-            bone.visible = visible;
-        }
-    }
-
     public void scaleModelForBaby(PoseStack poseStack, LivingEntity livingEntity, float partialTick, EquipmentSlot slot,
                                   HumanoidModel<?> original) {
-        if (!this.young)
+        if (!this.young) {
             return;
+        }
 
         if (slot == EquipmentSlot.HEAD) {
             if (original.scaleHead) {
                 float headScale = 1.5f / original.babyHeadScale;
-
                 poseStack.scale(headScale, headScale, headScale);
             }
 
             poseStack.translate(0, original.babyYHeadOffset / 16f, original.babyZHeadOffset / 16f);
         } else {
             float bodyScale = 1 / original.babyBodyScale;
-
             poseStack.scale(bodyScale, bodyScale, bodyScale);
             poseStack.translate(0, original.bodyYOffset / 16f, 0);
         }
@@ -120,7 +92,6 @@ public class GeoArmorRenderer extends HumanoidModel {
                                float r, float g, float b, float a) {
         Minecraft mc = Minecraft.getInstance();
         MultiBufferSource bufferSource = mc.renderBuffers().bufferSource();
-        var vertexConsumer = bufferSource.getBuffer(this.getRenderType(this.getTexture()));
 
         float partialTick = mc.getFrameTime();
 
@@ -129,7 +100,7 @@ public class GeoArmorRenderer extends HumanoidModel {
             scaleModelForBaby(poseStack, this.livingEntity, partialTick, this.equipmentSlot, this.original);
         }
 
-        model.renderToBuffer(poseStack, vertexConsumer, light, overlay, r, g, b, a);
+        this.instance.renderToBuffer(poseStack, bufferSource, getRenderType(this.texture), BedrockModelRenderTypes.polyMeshCutout(this.texture), light, overlay, r, g, b, a);
         poseStack.popPose();
 
         afterRender(poseStack, buffer, light, overlay, r, g, b, a);
@@ -152,11 +123,24 @@ public class GeoArmorRenderer extends HumanoidModel {
     }
 
     @Nullable
-    public EquipmentSlot getEquipmentSlot() {
-        return this.equipmentSlot;
+    public BedrockArmorModel getLegacyArmorModelForEpicFight() {
+        return this.legacyArmorModelForEpicFight;
     }
 
-    public BedrockArmorModel getModel() {
+    public BakedBedrockModel getModel() {
         return this.model;
+    }
+
+    public BedrockArmorInstance getInstance() {
+        return this.instance;
+    }
+
+    public EquipmentSlot getArmorSlot() {
+        return this.armorSlot;
+    }
+
+    @Nullable
+    public EquipmentSlot getCurrentSlot() {
+        return this.equipmentSlot;
     }
 }
