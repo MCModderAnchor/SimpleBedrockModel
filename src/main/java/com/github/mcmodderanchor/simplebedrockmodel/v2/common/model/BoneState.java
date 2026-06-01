@@ -1,7 +1,7 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
 
 import com.maydaymemory.mae.basic.BoneTransform;
-import com.maydaymemory.mae.basic.ZYXRotationView;
+import com.maydaymemory.mae.basic.RotationView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -46,45 +46,35 @@ public class BoneState {
     }
 
     public void reset() {
-        this.x = 0;
-        this.y = 0;
-        this.z = 0;
-        this.rotation.identity();
-        this.rotationInEuler.zero();
-        this.xScale = 1;
-        this.yScale = 1;
-        this.zScale = 1;
+        this.x = definition.bindX();
+        this.y = definition.bindY();
+        this.z = definition.bindZ();
+        this.rotation.set(definition.bindRotation());
+        this.rotationInEuler.set(definition.bindEulerRotation());
+        this.xScale = definition.bindXScale();
+        this.yScale = definition.bindYScale();
+        this.zScale = definition.bindZScale();
         this.visible = true;
         this.illuminated = false;
     }
 
     public void translateAndRotateAndScale(PoseStack poseStack) {
-        Matrix4f bindLocalTransform = definition.bindLocalTransform();
-        if (bindLocalTransform != null) {
-            poseStack.last().pose().mul(bindLocalTransform);
-            poseStack.last().normal().mul(definition.bindLocalNormalTransform());
-        }
-        applyAnimationDelta(poseStack);
+        Matrix4f localTransform = getLocalTransform();
+        poseStack.last().pose().mul(localTransform);
+        poseStack.last().normal().mul(new org.joml.Matrix3f(localTransform));
     }
 
     public Matrix4f getLocalTransform() {
-        Matrix4f bindLocalTransform = definition.bindLocalTransform();
-        Matrix4f matrix = bindLocalTransform == null ? new Matrix4f() : new Matrix4f(bindLocalTransform);
-        return matrix.mul(getAnimationDeltaTransform());
+        Matrix4f foldedParentTransform = definition.foldedParentTransform();
+        Matrix4f matrix = foldedParentTransform == null ? new Matrix4f() : new Matrix4f(foldedParentTransform);
+        return matrix.mul(getCurrentSelfTransform());
     }
 
-    private void applyAnimationDelta(PoseStack poseStack) {
-        if (x != 0 || y != 0 || z != 0) {
-            poseStack.translate(x / 16.0F, y / 16.0F, z / 16.0F);
-        }
-        poseStack.translate(definition.pivotX(), definition.pivotY(), definition.pivotZ());
-        poseStack.last().pose().rotate(rotation);
-        poseStack.last().normal().rotate(rotation);
-        poseStack.scale(xScale, yScale, zScale);
-        poseStack.translate(-definition.pivotX(), -definition.pivotY(), -definition.pivotZ());
+    private Matrix4f getCurrentSelfTransform() {
+        return createSelfTransform(x, y, z, rotation, xScale, yScale, zScale);
     }
 
-    private Matrix4f getAnimationDeltaTransform() {
+    private Matrix4f createSelfTransform(float x, float y, float z, Quaternionf rotation, float xScale, float yScale, float zScale) {
         Matrix4f matrix = new Matrix4f();
         if (x != 0 || y != 0 || z != 0) {
             matrix.translate(x / 16.0F, y / 16.0F, z / 16.0F);
@@ -106,6 +96,23 @@ public class BoneState {
     }
 
     public BoneTransform getBoneTransform() {
-        return new BoneTransform(index(), new Vector3f(x, y, z), new ZYXRotationView(rotation), new Vector3f(xScale, yScale, zScale));
+        return new BoneTransform(index(), new Vector3f(x, y, z), new BindRotationView(rotation, rotationInEuler), new Vector3f(xScale, yScale, zScale));
+    }
+
+    private record BindRotationView(Quaternionf quaternion, Vector3f euler) implements RotationView {
+        private BindRotationView(Quaternionf quaternion, Vector3f euler) {
+            this.quaternion = new Quaternionf(quaternion);
+            this.euler = new Vector3f(euler);
+        }
+
+        @Override
+        public Vector3f asEulerAngle() {
+            return new Vector3f(euler);
+        }
+
+        @Override
+        public Quaternionf asQuaternion() {
+            return new Quaternionf(quaternion);
+        }
     }
 }

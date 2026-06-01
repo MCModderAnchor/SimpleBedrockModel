@@ -14,8 +14,13 @@ public record BoneDefinition(
         float pivotX,
         float pivotY,
         float pivotZ,
+        float bindX,
+        float bindY,
+        float bindZ,
         @Nullable Matrix4f bindLocalTransform,
         @Nullable Matrix3f bindLocalNormalTransform,
+        @Nullable Matrix4f foldedParentTransform,
+        @Nullable Matrix3f foldedParentNormalTransform,
         Quaternionf bindRotation,
         Vector3f bindEulerRotation,
         float bindXScale,
@@ -27,6 +32,8 @@ public record BoneDefinition(
     public BoneDefinition {
         bindLocalTransform = bindLocalTransform == null ? null : new Matrix4f(bindLocalTransform);
         bindLocalNormalTransform = bindLocalNormalTransform == null ? null : new Matrix3f(bindLocalNormalTransform);
+        foldedParentTransform = foldedParentTransform == null ? null : new Matrix4f(foldedParentTransform);
+        foldedParentNormalTransform = foldedParentNormalTransform == null ? null : new Matrix3f(foldedParentNormalTransform);
         bindRotation = new Quaternionf(bindRotation);
         bindEulerRotation = new Vector3f(bindEulerRotation);
         children = children.clone();

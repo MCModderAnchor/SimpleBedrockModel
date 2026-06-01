@@ -131,11 +131,13 @@ public class BedrockModelInstance implements Skeleton {
             }
             Vector3fc translation = boneTransform.translation();
             Quaternionf rotation = new Quaternionf(boneTransform.rotation().asQuaternion());
+            Vector3fc eulerRotation = boneTransform.rotation().asEulerAngle();
             Vector3fc scale = boneTransform.scale();
             bone.x = translation.x();
             bone.y = translation.y();
             bone.z = translation.z();
             bone.rotation.set(rotation);
+            bone.rotationInEuler.set(eulerRotation);
             bone.xScale = scale.x();
             bone.yScale = scale.y();
             bone.zScale = scale.z();

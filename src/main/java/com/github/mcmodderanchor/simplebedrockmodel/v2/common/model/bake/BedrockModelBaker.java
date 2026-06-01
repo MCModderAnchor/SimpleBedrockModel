@@ -168,9 +168,14 @@ public class BedrockModelBaker {
             Matrix4f bindLocalTransform = bindLocalTransformToRuntimeParent(bone, parentIndex, runtimeIndex);
             Matrix3f bindLocalNormalTransform = bindLocalTransform == null ? null : new Matrix3f(bindLocalTransform);
             int[] childArray = children.get(bone.runtimeIndex).stream().mapToInt(Integer::intValue).toArray();
+            float bindX = bindXToRuntimeParent(bone, parentIndex, runtimeIndex);
+            float bindY = bindYToRuntimeParent(bone, parentIndex, runtimeIndex);
+            float bindZ = bindZToRuntimeParent(bone, parentIndex, runtimeIndex);
+            Matrix4f foldedParentTransform = foldedParentTransform(bindLocalTransform, bindX, bindY, bindZ, bone);
+            Matrix3f foldedParentNormalTransform = foldedParentTransform == null ? null : new Matrix3f(foldedParentTransform);
             result[bone.runtimeIndex] = new BoneDefinition(bone.name, bone.runtimeIndex, parentIndex, childArray,
-                    bone.pivotX, bone.pivotY, bone.pivotZ, bindLocalTransform, bindLocalNormalTransform,
-                    bone.bindRotation, bone.bindEulerRotation, 1, 1, 1, false, false);
+                    bone.pivotX, bone.pivotY, bone.pivotZ, bindX, bindY, bindZ, bindLocalTransform, bindLocalNormalTransform,
+                    foldedParentTransform, foldedParentNormalTransform, bone.bindRotation, bone.bindEulerRotation, 1, 1, 1, false, false);
         }
         return result;
     }
@@ -196,7 +201,8 @@ public class BedrockModelBaker {
         for (int i = 0; i < definitions.length; i++) {
             BoneDefinition def = definitions[i];
             result[i] = new BoneDefinition(def.name(), def.index(), def.parentIndex(), def.children(),
-                    def.pivotX(), def.pivotY(), def.pivotZ(), def.bindLocalTransform(), def.bindLocalNormalTransform(),
+                    def.pivotX(), def.pivotY(), def.pivotZ(), def.bindX(), def.bindY(), def.bindZ(),
+                    def.bindLocalTransform(), def.bindLocalNormalTransform(), def.foldedParentTransform(), def.foldedParentNormalTransform(),
                     def.bindRotation(), def.bindEulerRotation(), def.bindXScale(), def.bindYScale(), def.bindZScale(),
                     hasQuadsInTree[i], hasVerticesInTree[i]);
         }
@@ -229,6 +235,43 @@ public class BedrockModelBaker {
         return -1;
     }
 
+    private static float bindXToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
+        float parentPivotX = parentIndex < 0 ? 0.0f : runtimeIndex.bones.get(parentIndex).pivotX;
+        return (bone.pivotX - parentPivotX) * 16.0f;
+    }
+
+    private static float bindYToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
+        float parentPivotY = parentIndex < 0 ? 0.0f : runtimeIndex.bones.get(parentIndex).pivotY;
+        return (bone.pivotY - parentPivotY) * 16.0f;
+    }
+
+    private static float bindZToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
+        float parentPivotZ = parentIndex < 0 ? 0.0f : runtimeIndex.bones.get(parentIndex).pivotZ;
+        return (bone.pivotZ - parentPivotZ) * 16.0f;
+    }
+
+    @Nullable
+    private static Matrix4f foldedParentTransform(@Nullable Matrix4f bindLocalTransform, float bindX, float bindY, float bindZ, CompileBone bone) {
+        Matrix4f fullBind = bindLocalTransform == null ? new Matrix4f() : new Matrix4f(bindLocalTransform);
+        Matrix4f selfBind = createSelfBindTransform(bindX, bindY, bindZ, bone.pivotX, bone.pivotY, bone.pivotZ,
+                bone.bindRotation, 1, 1, 1);
+        Matrix4f foldedParent = fullBind.mul(selfBind.invert(new Matrix4f()), new Matrix4f());
+        return isIdentity(foldedParent) ? null : foldedParent;
+    }
+
+    private static Matrix4f createSelfBindTransform(float x, float y, float z, float pivotX, float pivotY, float pivotZ,
+                                                    Quaternionf rotation, float xScale, float yScale, float zScale) {
+        Matrix4f matrix = new Matrix4f();
+        if (x != 0 || y != 0 || z != 0) {
+            matrix.translate(x / 16.0F, y / 16.0F, z / 16.0F);
+        }
+        matrix.translate(pivotX, pivotY, pivotZ);
+        matrix.rotate(rotation);
+        matrix.scale(xScale, yScale, zScale);
+        matrix.translate(-pivotX, -pivotY, -pivotZ);
+        return matrix;
+    }
+
     @Nullable
     private static Matrix4f bindLocalTransformToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
         Matrix4f sourceGlobal = globalBindMatrix(bone);
@@ -249,8 +292,9 @@ public class BedrockModelBaker {
     private static Pose createBindPose(BoneDefinition[] bones) {
         PoseBuilder poseBuilder = new ArrayPoseBuilder();
         for (BoneDefinition bone : bones) {
-            poseBuilder.addBoneTransform(new BoneTransform(bone.index(), new Vector3f(),
-                    new BindRotationView(new Quaternionf(), new Vector3f()), new Vector3f(1, 1, 1)));
+            poseBuilder.addBoneTransform(new BoneTransform(bone.index(), new Vector3f(bone.bindX(), bone.bindY(), bone.bindZ()),
+                    new BindRotationView(bone.bindRotation(), bone.bindEulerRotation()),
+                    new Vector3f(bone.bindXScale(), bone.bindYScale(), bone.bindZScale())));
         }
         return poseBuilder.toPose();
     }
