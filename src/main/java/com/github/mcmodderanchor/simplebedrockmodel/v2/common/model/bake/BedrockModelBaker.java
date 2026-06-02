@@ -175,7 +175,7 @@ public class BedrockModelBaker {
             Matrix3f foldedParentNormalTransform = foldedParentTransform == null ? null : new Matrix3f(foldedParentTransform);
             result[bone.runtimeIndex] = new BoneDefinition(bone.name, bone.runtimeIndex, parentIndex, childArray,
                     bone.pivotX, bone.pivotY, bone.pivotZ, bindX, bindY, bindZ, bindLocalTransform, bindLocalNormalTransform,
-                    foldedParentTransform, foldedParentNormalTransform, bone.bindRotation, bone.bindEulerRotation, 1, 1, 1, false, false);
+                    foldedParentTransform, foldedParentNormalTransform, bone.bindRotation, bone.bindEulerRotation, false, false);
         }
         return result;
     }
@@ -203,8 +203,7 @@ public class BedrockModelBaker {
             result[i] = new BoneDefinition(def.name(), def.index(), def.parentIndex(), def.children(),
                     def.pivotX(), def.pivotY(), def.pivotZ(), def.bindX(), def.bindY(), def.bindZ(),
                     def.bindLocalTransform(), def.bindLocalNormalTransform(), def.foldedParentTransform(), def.foldedParentNormalTransform(),
-                    def.bindRotation(), def.bindEulerRotation(), def.bindXScale(), def.bindYScale(), def.bindZScale(),
-                    hasQuadsInTree[i], hasVerticesInTree[i]);
+                    def.bindRotation(), def.bindEulerRotation(), hasQuadsInTree[i], hasVerticesInTree[i]);
         }
         return result;
     }
@@ -294,7 +293,7 @@ public class BedrockModelBaker {
         for (BoneDefinition bone : bones) {
             poseBuilder.addBoneTransform(new BoneTransform(bone.index(), new Vector3f(bone.bindX(), bone.bindY(), bone.bindZ()),
                     new BindRotationView(bone.bindRotation(), bone.bindEulerRotation()),
-                    new Vector3f(bone.bindXScale(), bone.bindYScale(), bone.bindZScale())));
+                    new Vector3f(1.0f, 1.0f, 1.0f)));
         }
         return poseBuilder.toPose();
     }

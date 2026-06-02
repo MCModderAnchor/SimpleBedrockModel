@@ -23,9 +23,6 @@ public record BoneDefinition(
         @Nullable Matrix3f foldedParentNormalTransform,
         Quaternionf bindRotation,
         Vector3f bindEulerRotation,
-        float bindXScale,
-        float bindYScale,
-        float bindZScale,
         boolean hasQuadsInTree,
         boolean hasVerticesInTree
 ) {

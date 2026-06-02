@@ -3,6 +3,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
 import com.maydaymemory.mae.basic.BoneTransform;
 import com.maydaymemory.mae.basic.RotationView;
 import com.mojang.blaze3d.vertex.PoseStack;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -51,31 +52,35 @@ public class BoneState {
         this.z = definition.bindZ();
         this.rotation.set(definition.bindRotation());
         this.rotationInEuler.set(definition.bindEulerRotation());
-        this.xScale = definition.bindXScale();
-        this.yScale = definition.bindYScale();
-        this.zScale = definition.bindZScale();
+        this.xScale = 1.0f;
+        this.yScale = 1.0f;
+        this.zScale = 1.0f;
         this.visible = true;
         this.illuminated = false;
     }
 
     public void translateAndRotateAndScale(PoseStack poseStack) {
-        Matrix4f localTransform = getLocalTransform();
-        poseStack.last().pose().mul(localTransform);
-        poseStack.last().normal().mul(new org.joml.Matrix3f(localTransform));
+        Matrix4f pose = poseStack.last().pose();
+        Matrix3f normal = poseStack.last().normal();
+        Matrix4f foldedParentTransform = definition.foldedParentTransform();
+        if (foldedParentTransform != null) {
+            pose.mul(foldedParentTransform);
+            Matrix3f foldedParentNormalTransform = definition.foldedParentNormalTransform();
+            normal.mul(foldedParentNormalTransform == null ? new Matrix3f(foldedParentTransform) : foldedParentNormalTransform);
+        }
+        applyCurrentSelfTransform(pose, normal);
     }
 
     public Matrix4f getLocalTransform() {
-        Matrix4f foldedParentTransform = definition.foldedParentTransform();
-        Matrix4f matrix = foldedParentTransform == null ? new Matrix4f() : new Matrix4f(foldedParentTransform);
-        return matrix.mul(getCurrentSelfTransform());
-    }
-
-    private Matrix4f getCurrentSelfTransform() {
-        return createSelfTransform(x, y, z, rotation, xScale, yScale, zScale);
-    }
-
-    private Matrix4f createSelfTransform(float x, float y, float z, Quaternionf rotation, float xScale, float yScale, float zScale) {
         Matrix4f matrix = new Matrix4f();
+        Matrix4f foldedParentTransform = definition.foldedParentTransform();
+        if (foldedParentTransform != null) {
+            matrix.mul(foldedParentTransform);
+        }
+        return applyCurrentSelfTransform(matrix);
+    }
+
+    private Matrix4f applyCurrentSelfTransform(Matrix4f matrix) {
         if (x != 0 || y != 0 || z != 0) {
             matrix.translate(x / 16.0F, y / 16.0F, z / 16.0F);
         }
@@ -84,6 +89,12 @@ public class BoneState {
         matrix.scale(xScale, yScale, zScale);
         matrix.translate(-definition.pivotX(), -definition.pivotY(), -definition.pivotZ());
         return matrix;
+    }
+
+    private void applyCurrentSelfTransform(Matrix4f pose, Matrix3f normal) {
+        applyCurrentSelfTransform(pose);
+        normal.rotate(rotation);
+        normal.scale(xScale, yScale, zScale);
     }
 
     public Matrix4f getBindLocalTransform() {
