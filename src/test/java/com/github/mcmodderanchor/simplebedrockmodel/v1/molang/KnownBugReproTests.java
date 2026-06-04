@@ -50,6 +50,28 @@ class KnownBugReproTests {
                 "编译器: !math.abs(0) = !0.0 = 1.0, 但Bug下返回 0.0");
     }
 
+    @Test
+    @DisplayName("Bug 1 回归: !math.min(2, 0) 应先调用函数再取反")
+    void bangWithMultiArgumentFunctionCall_bindsToCallResult() {
+        MochaEngine<?> engine = MochaEngine.createStandard();
+
+        assertEquals(1.0, engine.eval("!math.min(2, 0)"), 0.0001,
+                "解释器: !math.min(2, 0) 应等价于 !(math.min(2, 0))");
+        assertEquals(1.0, engine.compile("!math.min(2, 0)").evaluate(), 0.0001,
+                "编译器: !math.min(2, 0) 应等价于 !(math.min(2, 0))");
+    }
+
+    @Test
+    @DisplayName("Bug 1 回归: -math.abs(-3) 应先调用函数再取负")
+    void arithmeticNegationWithFunctionCall_bindsToCallResult() {
+        MochaEngine<?> engine = MochaEngine.createStandard();
+
+        assertEquals(-3.0, engine.eval("-math.abs(-3)"), 0.0001,
+                "解释器: -math.abs(-3) 应等价于 -(math.abs(-3))");
+        assertEquals(-3.0, engine.compile("-math.abs(-3)").evaluate(), 0.0001,
+                "编译器: -math.abs(-3) 应等价于 -(math.abs(-3))");
+    }
+
     // ========================================================================
     // Bug 2: MolangCompilingVisitor.visitCall — 参数循环修改 expectedType 未恢复
     //
@@ -59,29 +81,59 @@ class KnownBugReproTests {
     // 而非原始的 BOOLEAN_TYPE。此时跳过 addCast（double→double 无操作），
     // 但栈上留下 double，而 AND 处理器的 IFEQ 期望 int → ASM 帧合并失败。
     //
-    // 用 math.random()（非纯函数，防常量折叠）作为 math.abs 的参数来触发。
+    // 用 math.random(0, 1)（非纯函数，防常量折叠）作为 math.abs 的参数来触发。
     // ========================================================================
 
     @Test
-    @DisplayName("Bug 2: 1 && math.abs(math.random()) ASM 帧合并失败")
-    void andWithMathAbsOfRandom_throwsDuringCompile() {
-        MochaEngine<?> engine = MochaEngine.createStandard();
+    @DisplayName("Bug 2: 1 && math.abs(math.random(0, 1)) 应正常编译并求值")
+    void andWithMathAbsOfRandom_compilesAndEvaluates() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
 
-        // math.abs 的参数循环将 expectedType 覆盖为 DOUBLE_TYPE，
-        // 返回后 AND 的 IFEQ 期望 int 但栈上是 double → 崩溃
-        assertThrows(Throwable.class, () -> {
-            engine.compile("1 && math.abs(math.random())");
-        }, "1 && math.abs(math.random()) 编译时应抛出异常");
+        MolangExpression compiled = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "1 && math.abs(math.random(0, 1))"),
+                "1 && math.abs(math.random(0, 1)) 应正常编译");
+        assertDoesNotThrow(() -> compiled.evaluate(ctx),
+                "1 && math.abs(math.random(0, 1)) 应正常求值");
     }
 
     @Test
-    @DisplayName("Bug 2: 0 || math.max(math.random(), 1) 同样触发")
-    void orWithMathMax_throwsDuringCompile() {
-        MochaEngine<?> engine = MochaEngine.createStandard();
+    @DisplayName("Bug 2: 0 || math.max(math.random(0, 1), 1) 应正常编译并返回 1.0")
+    void orWithMathMax_compilesAndEvaluates() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
 
-        assertThrows(Throwable.class, () -> {
-            engine.compile("0 || math.max(math.random(), 1)");
-        }, "0 || math.max(math.random(), 1) 编译时应抛出异常");
+        MolangExpression compiled = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "0 || math.max(math.random(0, 1), 1)"),
+                "0 || math.max(math.random(0, 1), 1) 应正常编译");
+        assertEquals(1.0, assertDoesNotThrow(() -> compiled.evaluate(ctx)), 0.0001,
+                "0 || math.max(math.random(0, 1), 1) 应返回 1.0");
+    }
+
+    @Test
+    @DisplayName("Bug 2 回归: !math.max(math.random(0, 1), 1) 应正常编译并返回 0.0")
+    void bangWithMathMaxOfRandom_compilesAndEvaluates() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+        MolangExpression compiled = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "!math.max(math.random(0, 1), 1)"),
+                "!math.max(math.random(0, 1), 1) 应正常编译");
+        assertEquals(0.0, assertDoesNotThrow(() -> compiled.evaluate(ctx)), 0.0001,
+                "!math.max(math.random(0, 1), 1) 应返回 0.0");
+    }
+
+    @Test
+    @DisplayName("Bug 2 回归: 函数调用位于 AND 左侧时也应恢复 expectedType")
+    void andWithFunctionCallOnLeft_compilesAndEvaluates() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+        MolangExpression compiled = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "math.max(math.random(0, 1), 1) && 1"),
+                "math.max(math.random(0, 1), 1) && 1 应正常编译");
+        assertEquals(1.0, assertDoesNotThrow(() -> compiled.evaluate(ctx)), 0.0001,
+                "math.max(math.random(0, 1), 1) && 1 应返回 1.0");
     }
 
     // ========================================================================
@@ -94,31 +146,75 @@ class KnownBugReproTests {
     // ========================================================================
 
     @Test
-    @DisplayName("Bug 3: !query.anim_time 导致 VerifyError")
-    void bangQueryAccess_throwsVerifyError() {
+    @DisplayName("Bug 3: !query.anim_time 应正常返回 0.0")
+    void bangQueryAccess_evaluatesToFalse() {
         MolangContext<Object> ctx = new MolangContext<>();
         ctx.prepareEvaluation(2.5f);
         MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
 
-        assertThrows(Throwable.class, () -> {
-            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "!query.anim_time");
-            expr.evaluate(ctx);
-        }, "!query.anim_time 应抛出 VerifyError");
+        MolangExpression expr = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "!query.anim_time"),
+                "!query.anim_time 应正常编译");
+        assertEquals(0.0, assertDoesNotThrow(() -> expr.evaluate(ctx)), 0.0001,
+                "!query.anim_time 应返回 0.0");
     }
 
     @Test
-    @DisplayName("Bug 3: !variable.x（variable 路径也返回 double）")
-    void bangVariableAccess_throwsVerifyError() {
+    @DisplayName("Bug 3: !variable.x 应正常返回 0.0")
+    void bangVariableAccess_evaluatesToFalse() {
         MolangContext<Object> ctx = new MolangContext<>();
         ctx.prepareEvaluation(1.0f);
         MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
 
         // 先赋值
         MolangEngineHelper.compileExpression(engine, "variable.x = 42").evaluate(ctx);
-        // 再取反 — variable 路径也返回 double 不检查 expectedType
-        assertThrows(Throwable.class, () -> {
-            MolangExpression expr = MolangEngineHelper.compileExpression(engine, "!variable.x");
-            expr.evaluate(ctx);
-        }, "!variable.x 应抛出 VerifyError");
+        // 再取反 — 非零值取反应为 0.0
+        MolangExpression expr = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "!variable.x"),
+                "!variable.x 应正常编译");
+        assertEquals(0.0, assertDoesNotThrow(() -> expr.evaluate(ctx)), 0.0001,
+                "!variable.x 应返回 0.0");
+    }
+
+    @Test
+    @DisplayName("Bug 3 回归: !variable.zero 应正常返回 1.0")
+    void bangVariableZero_evaluatesToTrue() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+        MolangEngineHelper.compileExpression(engine, "variable.zero = 0").evaluate(ctx);
+        MolangExpression expr = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "!variable.zero"),
+                "!variable.zero 应正常编译");
+        assertEquals(1.0, assertDoesNotThrow(() -> expr.evaluate(ctx)), 0.0001,
+                "!variable.zero 应返回 1.0");
+    }
+
+    @Test
+    @DisplayName("Bug 3 回归: query access 位于 AND 左侧时应正常转 boolean")
+    void queryAccessInAnd_compilesAndEvaluates() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        ctx.prepareEvaluation(2.5f);
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+        MolangExpression expr = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "query.anim_time && 1"),
+                "query.anim_time && 1 应正常编译");
+        assertEquals(1.0, assertDoesNotThrow(() -> expr.evaluate(ctx)), 0.0001,
+                "query.anim_time && 1 应返回 1.0");
+    }
+
+    @Test
+    @DisplayName("Bug 3 回归: variable access 位于 OR 右侧时应正常转 boolean")
+    void variableAccessInOr_compilesAndEvaluates() {
+        MolangContext<Object> ctx = new MolangContext<>();
+        MochaEngine<?> engine = MolangEngineHelper.createEngine(ctx);
+
+        MolangEngineHelper.compileExpression(engine, "variable.enabled = 1").evaluate(ctx);
+        MolangExpression expr = assertDoesNotThrow(() ->
+                MolangEngineHelper.compileExpression(engine, "0 || variable.enabled"),
+                "0 || variable.enabled 应正常编译");
+        assertEquals(1.0, assertDoesNotThrow(() -> expr.evaluate(ctx)), 0.0001,
+                "0 || variable.enabled 应返回 1.0");
     }
 }

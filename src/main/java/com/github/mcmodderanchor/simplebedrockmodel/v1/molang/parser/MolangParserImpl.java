@@ -39,6 +39,7 @@ import static java.util.Objects.requireNonNull;
 final class MolangParserImpl implements MolangParser {
 
     private static final Object UNSET_FLAG = new Object();
+    private static final int UNARY_PRECEDENCE = 1500;
 
     private final MolangLexer lexer;
 
@@ -125,7 +126,7 @@ final class MolangParserImpl implements MolangParser {
                 return expr;
             case SUB:
                 lexer.next();
-                final Expression operatedExpression = parseSingle(lexer);
+                final Expression operatedExpression = parseCompoundExpression(lexer, UNARY_PRECEDENCE);
                 if (operatedExpression instanceof DoubleExpression) {
                     // NEGATE(A) is just parsed as (-A)
                     return new DoubleExpression(-((DoubleExpression) operatedExpression).value());
@@ -133,7 +134,7 @@ final class MolangParserImpl implements MolangParser {
                 return new UnaryExpression(UnaryExpression.Op.ARITHMETICAL_NEGATION, operatedExpression);
             case BANG:
                 lexer.next();
-                return new UnaryExpression(UnaryExpression.Op.LOGICAL_NEGATION, parseSingle(lexer));
+                return new UnaryExpression(UnaryExpression.Op.LOGICAL_NEGATION, parseCompoundExpression(lexer, UNARY_PRECEDENCE));
             case RETURN:
                 lexer.next();
                 return new UnaryExpression(UnaryExpression.Op.RETURN, MolangParserImpl.parseCompoundExpression(lexer, 0));
