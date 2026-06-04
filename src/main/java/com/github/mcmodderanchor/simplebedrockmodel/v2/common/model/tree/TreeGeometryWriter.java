@@ -1,6 +1,7 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockCube;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium.SodiumCompat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -29,8 +30,19 @@ public final class TreeGeometryWriter {
     private TreeGeometryWriter() {
     }
 
-    public static synchronized void writeCubes(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
-                                               int light, int overlay, float red, float green, float blue, float alpha) {
+    public static boolean writeCubesSodium(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                           int light, int overlay, float red, float green, float blue, float alpha) {
+        return SodiumCompat.writeCubes(cubes, consumer, light, overlay, red, green, blue, alpha, poseMatrix, normalMatrix);
+    }
+
+    public static void writeCubes(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                  int light, int overlay, float red, float green, float blue, float alpha) {
+        if (writeCubesSodium(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha)) return;
+        writeCubesFallback(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha);
+    }
+
+    public static synchronized void writeCubesFallback(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                                       int light, int overlay, float red, float green, float blue, float alpha) {
         for (ICube cube : cubes) {
             CUBE_POSE.identity();
             CUBE_NORMAL_POSE.identity();
@@ -44,8 +56,19 @@ public final class TreeGeometryWriter {
         }
     }
 
+    public static boolean writePolyMeshesSodium(PolyMesh[] polyMeshes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                                int light, int overlay, float red, float green, float blue, float alpha) {
+        return SodiumCompat.writePolyMeshes(polyMeshes, consumer, light, overlay, red, green, blue, alpha, poseMatrix, normalMatrix);
+    }
+
     public static void writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
                                        int light, int overlay, float red, float green, float blue, float alpha) {
+        if (writePolyMeshesSodium(polyMeshes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha)) return;
+        writePolyMeshesFallback(polyMeshes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha);
+    }
+
+    public static void writePolyMeshesFallback(PolyMesh[] polyMeshes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                               int light, int overlay, float red, float green, float blue, float alpha) {
         for (PolyMesh polyMesh : polyMeshes) {
             for (PolyMesh.Triangle triangle : polyMesh.triangles()) {
                 emitVertex(consumer, triangle.a(), poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha);

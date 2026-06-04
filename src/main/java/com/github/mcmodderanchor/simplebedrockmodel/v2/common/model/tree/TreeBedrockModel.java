@@ -155,7 +155,7 @@ public class TreeBedrockModel implements BoneIndexProvider {
         ICube[] cubes = def.cubes();
         if (cubes.length == 0) return;
         if (AcceleratedRenderingCompat.renderQuads(def.getOrCreateCache(),
-                builder -> TreeGeometryWriter.writeCubes(cubes, builder, new Matrix4f(), new Matrix3f(), 0, 0, 1, 1, 1, 1),
+                builder -> TreeGeometryWriter.writeCubesFallback(cubes, builder, new Matrix4f(), new Matrix3f(), 0, 0, 1, 1, 1, 1),
                 consumer, pose, light, overlay, red, green, blue, alpha)) {
             return;
         }
@@ -168,7 +168,7 @@ public class TreeBedrockModel implements BoneIndexProvider {
         PolyMesh[] polyMeshes = def.polyMeshes();
         if (polyMeshes.length == 0) return;
         if (AcceleratedRenderingCompat.renderVertices(def.getOrCreateCache(),
-                builder -> TreeGeometryWriter.writePolyMeshes(polyMeshes, builder, new Matrix4f(), new Matrix3f(), 0, 0, 1, 1, 1, 1),
+                builder -> TreeGeometryWriter.writePolyMeshesFallback(polyMeshes, builder, new Matrix4f(), new Matrix3f(), 0, 0, 1, 1, 1, 1),
                 consumer, pose, light, overlay, red, green, blue, alpha)) {
             return;
         }
