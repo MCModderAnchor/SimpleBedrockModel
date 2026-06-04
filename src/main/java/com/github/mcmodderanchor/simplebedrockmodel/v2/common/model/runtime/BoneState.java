@@ -1,4 +1,4 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime;
 
 import com.maydaymemory.mae.basic.BoneTransform;
 import com.maydaymemory.mae.basic.RotationView;
@@ -9,7 +9,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 public class BoneState {
-    private final BoneDefinition definition;
+    private final RuntimeBoneDefinition definition;
     public float x;
     public float y;
     public float z;
@@ -21,12 +21,12 @@ public class BoneState {
     public boolean visible = true;
     public boolean illuminated = false;
 
-    BoneState(BoneDefinition definition) {
+    BoneState(RuntimeBoneDefinition definition) {
         this.definition = definition;
         reset();
     }
 
-    public BoneDefinition definition() {
+    public RuntimeBoneDefinition definition() {
         return definition;
     }
 
@@ -102,7 +102,7 @@ public class BoneState {
         return bindLocalTransform == null ? new Matrix4f() : new Matrix4f(bindLocalTransform);
     }
 
-    public Matrix4f getGlobalTransform(BedrockModelInstance instance) {
+    public Matrix4f getGlobalTransform(BoneTreeInstance instance) {
         return instance.getGlobalTransform(index());
     }
 

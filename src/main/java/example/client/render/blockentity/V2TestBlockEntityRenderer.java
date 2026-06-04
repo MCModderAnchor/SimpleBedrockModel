@@ -2,8 +2,8 @@ package example.client.render.blockentity;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockModelInstance;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import com.google.common.base.Suppliers;
@@ -14,8 +14,8 @@ import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import example.animation.MolangTestAnimationContext;
 import example.animation.TestBlockAnimationContext;
-import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
 import example.resource.KnownResources;
@@ -39,8 +39,8 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
 
     private final Supplier<BakedBedrockModel> testModelSupplier;
     private final Supplier<BakedBedrockModel> polyMeshTestModelSupplier;
-    private final WeakHashMap<TestBlockEntity, BedrockModelInstance> testInstanceCache = new WeakHashMap<>();
-    private final WeakHashMap<TestBlockEntity, BedrockModelInstance> polyMeshInstanceCache = new WeakHashMap<>();
+    private final WeakHashMap<TestBlockEntity, BakedModelInstance> testInstanceCache = new WeakHashMap<>();
+    private final WeakHashMap<TestBlockEntity, BakedModelInstance> polyMeshInstanceCache = new WeakHashMap<>();
 
     public V2TestBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
         this.testModelSupplier = Suppliers.memoize(this::loadTestModel);
@@ -68,14 +68,18 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
         if (model == null) {
             return;
         }
-        WeakHashMap<TestBlockEntity, BedrockModelInstance> instanceCache = polyMeshTest ? polyMeshInstanceCache : testInstanceCache;
-        BedrockModelInstance instance = instanceCache.computeIfAbsent(blockEntity, ignored -> model.createInstance());
+        WeakHashMap<TestBlockEntity, BakedModelInstance> instanceCache = polyMeshTest ? polyMeshInstanceCache : testInstanceCache;
+        BakedModelInstance instance = instanceCache.computeIfAbsent(blockEntity, ignored -> model.createInstance());
         instance.resetPose();
 
         if (!polyMeshTest) {
-            TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
-            animationInstance.renderTick();
-            Pose animationPose = animationInstance.getStateMachine().getPose();
+//            TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
+//            animationInstance.renderTick();
+//            Pose animationPose = animationInstance.getStateMachine().getPose();
+
+            MolangTestAnimationContext.tick();
+            Pose animationPose = MolangTestAnimationContext.evaluatePose();
+
             Pose blended = BLENDER.blend(instance.getBindPose(), animationPose);
             instance.applyPose(blended);
         }

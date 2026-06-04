@@ -4,9 +4,8 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockA
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoaders;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerOptions;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.event.RegisterV2BedrockResourcesEvent;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationFactory;
 import example.animation.MolangTestAnimationContext;
 import example.init.ExampleModRegister;
 import net.minecraft.resources.ResourceLocation;

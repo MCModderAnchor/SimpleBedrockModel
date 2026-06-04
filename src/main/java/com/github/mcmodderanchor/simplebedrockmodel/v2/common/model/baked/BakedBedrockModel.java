@@ -1,11 +1,11 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunkRenderer;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BedrockModelBaker;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneLocator;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.QueryTransform;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneState;
 import com.maydaymemory.mae.basic.Pose;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -24,12 +24,12 @@ import java.util.Map;
  * v2版本的基岩模型<br/>
  * 构建时，所有永远不会变化的骨骼将退化为查询点，其全部顶点合并到最近的动态骨骼上<br/>
  * 退化后的骨骼仍可查询在当前姿态下的位置，但是无法再对其进行变换操作<br/>
- * 同时，运行时数据改为由{@link BedrockModelInstance}承担，本类仅持有静态的骨骼和顶点信息
+ * 同时，运行时数据改为由{@link BakedModelInstance}承担，本类仅持有静态的骨骼和顶点信息
  */
 public class BakedBedrockModel implements BoneIndexProvider {
     private static final int MAX_LIGHT_TEXTURE = LightTexture.pack(15, 15);
     // 压缩后的骨骼
-    private final BoneDefinition[] bones;
+    private final BakedBoneDefinition[] bones;
     private final Map<String, Integer> boneIndexByName;
     // 烘培过后的顶点信息
     private final BakedGeometryChunk[] chunks;
@@ -47,10 +47,10 @@ public class BakedBedrockModel implements BoneIndexProvider {
     private final AABB renderBoundingBox;
 
 
-    public BakedBedrockModel(BoneDefinition[] bones, Map<String, Integer> boneIndexByName, BakedGeometryChunk[] chunks,
-                      BoneLocator[] locators, Map<String, BoneLocator> locatorByName,
-                      QueryTransform[] queryTransforms, Map<String, QueryTransform> queryTransformByName,
-                      Pose bindPose, AABB renderBoundingBox) {
+    public BakedBedrockModel(BakedBoneDefinition[] bones, Map<String, Integer> boneIndexByName, BakedGeometryChunk[] chunks,
+                             BoneLocator[] locators, Map<String, BoneLocator> locatorByName,
+                             QueryTransform[] queryTransforms, Map<String, QueryTransform> queryTransformByName,
+                             Pose bindPose, AABB renderBoundingBox) {
         this.bones = bones.clone();
         this.boneIndexByName = Map.copyOf(boneIndexByName);
         this.chunks = chunks.clone();
@@ -73,15 +73,15 @@ public class BakedBedrockModel implements BoneIndexProvider {
         return BedrockModelBaker.bake(pojo, options);
     }
 
-    public BedrockModelInstance createInstance() {
-        return new BedrockModelInstance(this);
+    public BakedModelInstance createInstance() {
+        return new BakedModelInstance(this);
     }
 
-    public BoneDefinition[] bones() {
+    public BakedBoneDefinition[] bones() {
         return bones.clone();
     }
 
-    BoneDefinition bone(int index) {
+    BakedBoneDefinition bone(int index) {
         return bones[index];
     }
 
@@ -106,12 +106,12 @@ public class BakedBedrockModel implements BoneIndexProvider {
     }
 
     @Nullable
-    BoneLocator locator(String name) {
+    public BoneLocator locator(String name) {
         return locatorByName.get(name);
     }
 
     @Nullable
-    QueryTransform queryTransform(String name) {
+    public QueryTransform queryTransform(String name) {
         return queryTransformByName.get(name);
     }
 
@@ -129,25 +129,25 @@ public class BakedBedrockModel implements BoneIndexProvider {
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void renderToBuffer(BedrockModelInstance instance, PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay) {
+    public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay) {
         renderToBuffer(instance, poseStack, buffer, packedLight, packedOverlay, 1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void renderToBuffer(BedrockModelInstance instance, PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
+    public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
                                float red, float green, float blue, float alpha) {
         renderBoneTree(instance, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha, true);
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void renderToBuffer(BedrockModelInstance instance, PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
+    public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
                                RenderType triangleRenderType, int packedLight, int packedOverlay) {
         renderToBuffer(instance, poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay,
                 1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void renderToBuffer(BedrockModelInstance instance, PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
+    public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
                                RenderType triangleRenderType, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
         VertexConsumer quadConsumer = bufferSource.getBuffer(quadRenderType);
         renderBoneTree(instance, poseStack, quadConsumer, packedLight, packedOverlay, red, green, blue, alpha, true);
@@ -156,13 +156,13 @@ public class BakedBedrockModel implements BoneIndexProvider {
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void renderBoneTree(BedrockModelInstance instance, PoseStack poseStack, VertexConsumer consumer,
-                                int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
-                                boolean quadsPass) {
+    public void renderBoneTree(BakedModelInstance instance, PoseStack poseStack, VertexConsumer consumer,
+                               int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
+                               boolean quadsPass) {
         if (rootChunk != null) {
             renderChunkForPass(rootChunk, poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass);
         }
-        for (BoneDefinition bone : bones) {
+        for (BakedBoneDefinition bone : bones) {
             if (bone.parentIndex() < 0) {
                 renderBone(instance, bone.index(), poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass);
             }
@@ -170,10 +170,10 @@ public class BakedBedrockModel implements BoneIndexProvider {
     }
 
     @OnlyIn(Dist.CLIENT)
-    public void renderBone(BedrockModelInstance instance, int boneIndex, PoseStack poseStack, VertexConsumer consumer,
-                            int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
-                            boolean quadsPass) {
-        BoneDefinition def = bones[boneIndex];
+    public void renderBone(BakedModelInstance instance, int boneIndex, PoseStack poseStack, VertexConsumer consumer,
+                           int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
+                           boolean quadsPass) {
+        BakedBoneDefinition def = bones[boneIndex];
         if (quadsPass ? !def.hasQuadsInTree() : !def.hasVerticesInTree()) {
             return;
         }

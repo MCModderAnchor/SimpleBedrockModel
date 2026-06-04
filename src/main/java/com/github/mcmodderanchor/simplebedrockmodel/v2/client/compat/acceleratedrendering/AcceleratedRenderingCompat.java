@@ -1,10 +1,12 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.acceleratedrendering;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+
+import java.util.function.Consumer;
 
 @OnlyIn(Dist.CLIENT)
 public final class AcceleratedRenderingCompat {
@@ -21,6 +23,20 @@ public final class AcceleratedRenderingCompat {
                                          int lightmap, int overlay, float red, float green, float blue, float alpha) {
         return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
                 && BackendHolder.RENDERER.renderVertices(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
+
+    public static boolean renderQuads(AcceleratedBedrockGeometryCache cache, Consumer<VertexConsumer> meshEmitter,
+                                      VertexConsumer consumer, PoseStack.Pose pose,
+                                      int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
+                && BackendHolder.RENDERER.renderQuads(cache, meshEmitter, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
+
+    public static boolean renderVertices(AcceleratedBedrockGeometryCache cache, Consumer<VertexConsumer> meshEmitter,
+                                         VertexConsumer consumer, PoseStack.Pose pose,
+                                         int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
+                && BackendHolder.RENDERER.renderVertices(cache, meshEmitter, consumer, pose, lightmap, overlay, red, green, blue, alpha);
     }
 
     private static final class BackendHolder {

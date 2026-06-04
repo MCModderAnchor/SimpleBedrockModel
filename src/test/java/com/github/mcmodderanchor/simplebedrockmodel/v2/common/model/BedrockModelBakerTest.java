@@ -3,8 +3,14 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.GsonUtil;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BedrockModelBaker;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerOptions;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BedrockModelBaker;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBoneDefinition;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.CubeBox;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.joml.Matrix4f;
@@ -34,10 +40,82 @@ class BedrockModelBakerTest {
         Set<String> animatedBones = loadAnimatedBones("tacz/examples/anim/kar98.animation.json");
         BakerOptions options = new BakerOptions(animatedBones, Set.of(), Set.of(Pattern.compile("Gun.*")), true, false);
         BakedBedrockModel model = BakedBedrockModel.bake(pojo, options);
-        BedrockModelInstance instance = model.createInstance();
+        BakedModelInstance instance = model.createInstance();
 
         assertNotNull(instance.getBone("GunFront"));
         assertNotNull(instance.getBone("Gunbody"));
+    }
+
+    @Test
+    @DisplayName("structured model keeps all source bones at runtime")
+    void structuredModelKeepsAllSourceBonesAtRuntime() throws IOException {
+        BedrockModelPOJO pojo = loadModel("tacz/examples/geo/kar98_geo.json");
+        TreeBedrockModel model = TreeBedrockModel.bake(pojo);
+        TreeModelInstance instance = model.createInstance();
+
+        assertEquals(pojo.getGeometryModelNew().getBones().length, model.bones().length);
+        assertNotNull(instance.getBone("root"));
+        assertNotNull(instance.getBone("GunFront"));
+        assertNotNull(instance.getQueryTransform("GunFront"));
+    }
+
+    @Test
+    @DisplayName("structured model keeps rotated cubes on source bone without virtual bones")
+    void structuredModelKeepsRotatedCubesOnSourceBoneWithoutVirtualBones() {
+        BedrockModelPOJO pojo = loadInlineModel("""
+                {
+                  "format_version": "1.12.0",
+                  "minecraft:geometry": [{
+                    "description": {"identifier":"geometry.test", "texture_width": 16, "texture_height": 16},
+                    "bones": [{
+                      "name": "root",
+                      "pivot": [0, 0, 0],
+                      "cubes": [{"origin": [0, 0, 0], "size": [2, 2, 2], "uv": [0, 0], "pivot": [1, 1, 1], "rotation": [0, 45, 0]}]
+                    }]
+                  }]
+                }
+                """);
+
+        TreeBedrockModel model = TreeBedrockModel.bake(pojo);
+        TreeBoneDefinition root = model.bone(model.getIndex("root"));
+
+        assertEquals(1, model.bones().length);
+        assertEquals(1, root.cubes().length);
+        assertInstanceOf(CubeBox.class, root.cubes()[0]);
+        assertTrue(root.cubes()[0].hasRotation());
+        assertNotNull(root.getOrCreateCache());
+    }
+
+    @Test
+    @DisplayName("structured model keeps polymesh on source bone cache")
+    void structuredModelKeepsPolyMeshOnSourceBoneCache() {
+        BedrockModelPOJO pojo = loadInlineModel("""
+                {
+                  "format_version": "1.12.0",
+                  "minecraft:geometry": [{
+                    "description": {"identifier":"geometry.mesh", "texture_width": 16, "texture_height": 16},
+                    "bones": [{
+                      "name": "mesh_bone",
+                      "pivot": [0, 0, 0],
+                      "poly_mesh": {
+                        "normalized_uvs": true,
+                        "positions": [[0,0,0], [1,0,0], [0,1,0]],
+                        "normals": [[0,0,1], [0,0,1], [0,0,1]],
+                        "uvs": [[0,0], [1,0], [0,1]],
+                        "polys": "tri_list"
+                      }
+                    }]
+                  }]
+                }
+                """);
+
+        TreeBedrockModel model = TreeBedrockModel.bake(pojo);
+        TreeBoneDefinition meshBone = model.bone(model.getIndex("mesh_bone"));
+
+        assertEquals(1, model.bones().length);
+        assertEquals(1, meshBone.polyMeshes().length);
+        assertTrue(meshBone.hasVertices());
+        assertNotNull(meshBone.getOrCreateCache());
     }
 
     private static void assertTaczFixture(String gunName, String foldedQueryBone) throws IOException {
@@ -45,7 +123,7 @@ class BedrockModelBakerTest {
         Set<String> animatedBones = loadAnimatedBones("tacz/examples/anim/" + gunName + ".animation.json");
         BakerOptions options = new BakerOptions(animatedBones, Set.of(), true, true);
         BakedBedrockModel model = BakedBedrockModel.bake(pojo, options);
-        BedrockModelInstance instance = model.createInstance();
+        BakedModelInstance instance = model.createInstance();
 
         int originalBoneCount = pojo.getGeometryModelNew().getBones().length;
         assertTrue(model.bones().length > 0, gunName);
@@ -69,6 +147,10 @@ class BedrockModelBakerTest {
              InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
             return GsonUtil.CLIENT_GSON.fromJson(reader, BedrockModelPOJO.class);
         }
+    }
+
+    private static BedrockModelPOJO loadInlineModel(String json) {
+        return GsonUtil.CLIENT_GSON.fromJson(json, BedrockModelPOJO.class);
     }
 
     private static Set<String> loadAnimatedBones(String resourceName) throws IOException {

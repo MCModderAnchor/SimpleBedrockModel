@@ -2,8 +2,8 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockArmorInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BedrockArmorInstance;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;

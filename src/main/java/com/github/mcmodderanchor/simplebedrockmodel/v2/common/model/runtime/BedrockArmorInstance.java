@@ -1,5 +1,6 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -11,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
  * v2 盔甲用的运行时实例封装。
  * 直接继承 BedrockModelInstance，便于在外部继续按常规实例使用。
  */
-public class BedrockArmorInstance extends BedrockModelInstance {
+public class BedrockArmorInstance extends BakedModelInstance {
     @Nullable
     private final BoneState armorHead;
     @Nullable

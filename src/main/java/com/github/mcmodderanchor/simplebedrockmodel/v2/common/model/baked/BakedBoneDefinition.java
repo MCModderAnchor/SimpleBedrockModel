@@ -1,12 +1,13 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.RuntimeBoneDefinition;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-public record BoneDefinition(
+public record BakedBoneDefinition(
         String name,
         int index,
         int parentIndex,
@@ -25,8 +26,8 @@ public record BoneDefinition(
         Vector3f bindEulerRotation,
         boolean hasQuadsInTree,
         boolean hasVerticesInTree
-) {
-    public BoneDefinition {
+) implements RuntimeBoneDefinition {
+    public BakedBoneDefinition {
         bindLocalTransform = bindLocalTransform == null ? null : new Matrix4f(bindLocalTransform);
         bindLocalNormalTransform = bindLocalNormalTransform == null ? null : new Matrix3f(bindLocalNormalTransform);
         foldedParentTransform = foldedParentTransform == null ? null : new Matrix4f(foldedParentTransform);

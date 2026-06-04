@@ -1,11 +1,9 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
-import com.maydaymemory.mae.basic.ArrayPoseBuilder;
-import com.maydaymemory.mae.basic.BoneTransform;
-import com.maydaymemory.mae.basic.Pose;
-import com.maydaymemory.mae.basic.PoseBuilder;
-import com.maydaymemory.mae.basic.Skeleton;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneLocator;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.QueryTransform;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -13,29 +11,18 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
-import org.joml.Vector3fc;
-
-import java.lang.Math;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 /**
- * 运行时模型对象，是动画应用的目标
+ * 运行时模型对象，是动画应用的目标。
  */
-public class BedrockModelInstance implements Skeleton {
+public class BakedModelInstance extends BoneTreeInstance {
     private final BakedBedrockModel baseModel;
-    private final BoneState[] bones;
 
-    public BedrockModelInstance(BakedBedrockModel baseModel) {
+    public BakedModelInstance(BakedBedrockModel baseModel) {
+        super(baseModel.bones(), baseModel.getBindPose());
         this.baseModel = baseModel;
-        this.bones = new BoneState[baseModel.boneCount()];
-        for (int i = 0; i < bones.length; i++) {
-            bones[i] = new BoneState(baseModel.bone(i));
-        }
     }
 
     public BakedBedrockModel baseModel() {
@@ -65,99 +52,7 @@ public class BedrockModelInstance implements Skeleton {
         baseModel.renderToBuffer(this, poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay, red, green, blue, alpha);
     }
 
-    @Nullable
-    public BoneState getBone(String name) {
-        int index = getIndex(name);
-        return index >= 0 ? bones[index] : null;
-    }
-
-    @Nullable
-    public BoneState getBone(int index) {
-        return index >= 0 && index < bones.length ? bones[index] : null;
-    }
-
-    public BoneState[] getBoneIndexes() {
-        return bones.clone();
-    }
-
-    public void resetPose() {
-        for (BoneState bone : bones) {
-            bone.reset();
-        }
-    }
-
-    public Matrix4f getGlobalTransform(int index) {
-        if (index < 0 || index >= bones.length) return new Matrix4f();
-        ArrayList<BoneState> chain = new ArrayList<>();
-        BoneState bone = bones[index];
-        while (bone != null) {
-            chain.add(bone);
-            int parentIndex = bone.parentIndex();
-            bone = parentIndex >= 0 && parentIndex < bones.length ? bones[parentIndex] : null;
-        }
-        Matrix4f matrix = new Matrix4f();
-        for (int i = chain.size() - 1; i >= 0; i--) {
-            matrix.mul(chain.get(i).getLocalTransform());
-        }
-        return matrix;
-    }
-
     @Override
-    public Collection<Integer> getChildren(int i) {
-        BoneState bone = getBone(i);
-        if (bone == null) {
-            return List.of();
-        }
-        int[] children = bone.children();
-        ArrayList<Integer> result = new ArrayList<>(children.length);
-        for (int child : children) {
-            result.add(child);
-        }
-        return result;
-    }
-
-    @Override
-    public int getFather(int i) {
-        BoneState bone = getBone(i);
-        return bone == null ? -1 : bone.parentIndex();
-    }
-
-    @Override
-    public void applyPose(Pose pose) {
-        for (BoneTransform boneTransform : pose.getBoneTransforms()) {
-            BoneState bone = getBone(boneTransform.boneIndex());
-            if (bone == null) {
-                continue;
-            }
-            Vector3fc translation = boneTransform.translation();
-            Quaternionf rotation = new Quaternionf(boneTransform.rotation().asQuaternion());
-            Vector3fc eulerRotation = boneTransform.rotation().asEulerAngle();
-            Vector3fc scale = boneTransform.scale();
-            bone.x = translation.x();
-            bone.y = translation.y();
-            bone.z = translation.z();
-            bone.rotation.set(rotation);
-            bone.rotationInEuler.set(eulerRotation);
-            bone.xScale = scale.x();
-            bone.yScale = scale.y();
-            bone.zScale = scale.z();
-        }
-    }
-
-    @Override
-    public Pose getPose() {
-        PoseBuilder poseBuilder = new ArrayPoseBuilder();
-        for (BoneState bone : bones) {
-            poseBuilder.addBoneTransform(bone.getBoneTransform());
-        }
-        return poseBuilder.toPose();
-    }
-
-    @Override
-    public Pose getBindPose() {
-        return baseModel.getBindPose();
-    }
-
     public int getIndex(String boneName) {
         return baseModel.getIndex(boneName);
     }

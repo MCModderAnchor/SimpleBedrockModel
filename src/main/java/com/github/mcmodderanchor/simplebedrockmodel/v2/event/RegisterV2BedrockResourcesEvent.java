@@ -3,7 +3,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.event;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoader;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoaders;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakerOptions;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerOptions;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationFactory;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationEntry;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelBakeContext;

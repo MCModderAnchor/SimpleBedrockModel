@@ -8,9 +8,9 @@ import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.renderer
 import com.github.argon4w.acceleratedrendering.core.meshes.IMesh;
 import com.github.argon4w.acceleratedrendering.core.meshes.collectors.CulledMeshCollector;
 import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedQuadData;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedVertexData;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedQuadData;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedVertexData;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.util.FastColor;
@@ -42,6 +42,18 @@ public final class AcceleratedRenderer {
         return render(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha, false);
     }
 
+    public boolean renderQuads(AcceleratedBedrockGeometryCache cache, Consumer<VertexConsumer> meshEmitter,
+                               VertexConsumer consumer, PoseStack.Pose pose,
+                               int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        return render(cache.quadMeshes, meshEmitter, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
+
+    public boolean renderVertices(AcceleratedBedrockGeometryCache cache, Consumer<VertexConsumer> meshEmitter,
+                                  VertexConsumer consumer, PoseStack.Pose pose,
+                                  int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        return render(cache.triangleMeshes, meshEmitter, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
+
     private boolean render(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
                            int lightmap, int overlay, float red, float green, float blue, float alpha, boolean quads) {
         IAcceleratedVertexConsumer extension = getExtension(consumer);
@@ -59,6 +71,19 @@ public final class AcceleratedRenderer {
                 emitVertices(builder, chunk.vertices());
             }
         });
+        extension.doRender(cachedMeshRenderer, context, pose.pose(), pose.normal(), lightmap, overlay, color);
+        return true;
+    }
+
+    private boolean render(Map<IBufferGraph, IMesh> meshCache, Consumer<VertexConsumer> meshEmitter,
+                           VertexConsumer consumer, PoseStack.Pose pose,
+                           int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        IAcceleratedVertexConsumer extension = getExtension(consumer);
+        if (!canRender(extension)) {
+            return false;
+        }
+        int color = packColor(red, green, blue, alpha);
+        RenderContext context = new RenderContext(meshCache, meshEmitter);
         extension.doRender(cachedMeshRenderer, context, pose.pose(), pose.normal(), lightmap, overlay, color);
         return true;
     }
