@@ -14,6 +14,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.CubeBox
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,6 +58,57 @@ class BedrockModelBakerTest {
         assertNotNull(instance.getBone("root"));
         assertNotNull(instance.getBone("GunFront"));
         assertNotNull(instance.getQueryTransform("GunFront"));
+    }
+
+    @Test
+    @DisplayName("structured bones expose linked parent and child references")
+    void structuredBonesExposeLinkedReferences() {
+        BedrockModelPOJO pojo = loadInlineModel("""
+                {
+                  "format_version": "1.12.0",
+                  "minecraft:geometry": [{
+                    "description": {"identifier":"geometry.test", "texture_width": 16, "texture_height": 16},
+                    "bones": [
+                      {"name": "root", "pivot": [0, 0, 0]},
+                      {"name": "child", "parent": "root", "pivot": [0, 0, 0]}
+                    ]
+                  }]
+                }
+                """);
+
+        TreeBedrockModel model = TreeBedrockModel.bake(pojo);
+        TreeBoneDefinition root = model.bone(model.getIndex("root"));
+        TreeBoneDefinition child = model.bone(model.getIndex("child"));
+
+        assertNull(root.parent());
+        assertEquals(1, root.childBones().length);
+        assertSame(child, root.childBones()[0]);
+        assertSame(root, child.parent());
+        assertEquals(0, child.childBones().length);
+    }
+
+    @Test
+    @DisplayName("structured model rotates local geometry without extra absolute pivot offset")
+    void structuredModelRotatesLocalGeometryWithoutExtraAbsolutePivotOffset() {
+        BedrockModelPOJO pojo = loadInlineModel("""
+                {
+                  "format_version": "1.12.0",
+                  "minecraft:geometry": [{
+                    "description": {"identifier":"geometry.test", "texture_width": 16, "texture_height": 16},
+                    "bones": [{"name": "root", "pivot": [16, 0, 0], "rotation": [0, 90, 0]}]
+                  }]
+                }
+                """);
+
+        TreeBedrockModel model = TreeBedrockModel.bake(pojo);
+        TreeModelInstance instance = model.createInstance();
+        Matrix4f transform = instance.getQueryTransform("root");
+        assertNotNull(transform);
+        Vector3f transformedPivot = transform.transformPosition(new Vector3f());
+
+        assertEquals(-1.0f, transformedPivot.x(), 1.0e-6f);
+        assertEquals(0.0f, transformedPivot.y(), 1.0e-6f);
+        assertEquals(0.0f, transformedPivot.z(), 1.0e-6f);
     }
 
     @Test

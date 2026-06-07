@@ -16,7 +16,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
@@ -37,6 +36,9 @@ public class TreeBedrockModel implements BoneIndexProvider {
                             Map<String, Map.Entry<Integer, LocatorData>> locatorByName, Pose bindPose,
                             AABB renderBoundingBox) {
         this.bones = bones;
+        for (TreeBoneDefinition bone : bones) {
+            bone.linkReferences(bones);
+        }
         this.boneIndexByName = Map.copyOf(boneIndexByName);
         this.locatorByName = Map.copyOf(locatorByName);
         this.bindPose = bindPose;
@@ -154,9 +156,7 @@ public class TreeBedrockModel implements BoneIndexProvider {
                                         int light, int overlay, float red, float green, float blue, float alpha) {
         ICube[] cubes = def.cubes();
         if (cubes.length == 0) return;
-        if (AcceleratedRenderingCompat.renderQuads(def.getOrCreateCache(),
-                builder -> TreeGeometryWriter.writeCubesFallback(cubes, builder, new Matrix4f(), new Matrix3f(), 0, 0, 1, 1, 1, 1),
-                consumer, pose, light, overlay, red, green, blue, alpha)) {
+        if (AcceleratedRenderingCompat.renderCubes(def, consumer, pose, light, overlay, red, green, blue, alpha)) {
             return;
         }
         TreeGeometryWriter.writeCubes(cubes, consumer, pose.pose(), pose.normal(), light, overlay, red, green, blue, alpha);
@@ -167,9 +167,7 @@ public class TreeBedrockModel implements BoneIndexProvider {
                                              int light, int overlay, float red, float green, float blue, float alpha) {
         PolyMesh[] polyMeshes = def.polyMeshes();
         if (polyMeshes.length == 0) return;
-        if (AcceleratedRenderingCompat.renderVertices(def.getOrCreateCache(),
-                builder -> TreeGeometryWriter.writePolyMeshesFallback(polyMeshes, builder, new Matrix4f(), new Matrix3f(), 0, 0, 1, 1, 1, 1),
-                consumer, pose, light, overlay, red, green, blue, alpha)) {
+        if (AcceleratedRenderingCompat.renderPolyMeshes(def, consumer, pose, light, overlay, red, green, blue, alpha)) {
             return;
         }
         TreeGeometryWriter.writePolyMeshes(polyMeshes, consumer, pose.pose(), pose.normal(), light, overlay, red, green, blue, alpha);

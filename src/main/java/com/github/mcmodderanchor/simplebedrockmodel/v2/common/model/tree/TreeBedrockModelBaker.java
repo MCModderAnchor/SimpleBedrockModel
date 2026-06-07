@@ -78,8 +78,6 @@ public class TreeBedrockModelBaker {
             float[] size = Arrays.copyOf(cube.getSize(), 3);
             float[] origin = Arrays.copyOf(cube.getOrigin(), 3);
             origin[0] = -(origin[0] + size[0]);
-            origin[1] = origin[1];
-            origin[2] = origin[2];
             Quaternionf rotation = null;
             float[] pivot = cube.getPivot() != null ? Arrays.copyOf(cube.getPivot(), 3) : null;
             if (pivot != null) pivot[0] = -pivot[0];

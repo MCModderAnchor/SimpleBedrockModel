@@ -6,7 +6,7 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-public interface RuntimeBoneDefinition {
+public interface BoneDefinition {
     String name();
 
     int index();
@@ -49,5 +49,9 @@ public interface RuntimeBoneDefinition {
     @Nullable
     default Matrix3f foldedParentNormalTransform() {
         return null;
+    }
+
+    default boolean rotateAroundPivot() {
+        return true;
     }
 }

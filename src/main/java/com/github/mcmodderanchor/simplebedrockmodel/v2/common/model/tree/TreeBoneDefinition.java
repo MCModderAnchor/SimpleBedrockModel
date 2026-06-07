@@ -2,20 +2,24 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.acceleratedrendering.AcceleratedBedrockGeometryCache;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.RuntimeBoneDefinition;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneDefinition;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.Map;
 
-public final class TreeBoneDefinition implements RuntimeBoneDefinition {
+public final class TreeBoneDefinition implements BoneDefinition {
     private final String name;
     private final int index;
     private final int parentIndex;
     private final int[] children;
+    @Nullable
+    private TreeBoneDefinition parent;
+    private TreeBoneDefinition[] childBones;
     private final float pivotX;
     private final float pivotY;
     private final float pivotZ;
@@ -43,6 +47,7 @@ public final class TreeBoneDefinition implements RuntimeBoneDefinition {
         this.index = index;
         this.parentIndex = parentIndex;
         this.children = children;
+        this.childBones = new TreeBoneDefinition[children.length];
         this.pivotX = pivotX;
         this.pivotY = pivotY;
         this.pivotZ = pivotZ;
@@ -58,39 +63,94 @@ public final class TreeBoneDefinition implements RuntimeBoneDefinition {
         this.hasVerticesInTree = hasVerticesInTree;
     }
 
-    @Override public String name() { return name; }
+    @Override
+    public String name() {
+        return name;
+    }
 
-    @Override public int index() { return index; }
+    @Override
+    public int index() {
+        return index;
+    }
 
-    @Override public int parentIndex() { return parentIndex; }
+    @Override
+    public int parentIndex() {
+        return parentIndex;
+    }
 
-    @Override public int[] children() { return children; }
+    @Override
+    public int[] children() {
+        return children;
+    }
 
-    @Override public float pivotX() { return pivotX; }
+    @Nullable
+    public TreeBoneDefinition parent() {
+        return parent;
+    }
 
-    @Override public float pivotY() { return pivotY; }
+    public TreeBoneDefinition[] childBones() {
+        return childBones;
+    }
 
-    @Override public float pivotZ() { return pivotZ; }
+    @Override
+    public float pivotX() {
+        return pivotX;
+    }
 
-    @Override public float bindX() { return bindX; }
+    @Override
+    public float pivotY() {
+        return pivotY;
+    }
 
-    @Override public float bindY() { return bindY; }
+    @Override
+    public float pivotZ() {
+        return pivotZ;
+    }
 
-    @Override public float bindZ() { return bindZ; }
+    @Override
+    public float bindX() {
+        return bindX;
+    }
 
-    @Override public Quaternionf bindRotation() { return new Quaternionf(bindRotation); }
+    @Override
+    public float bindY() {
+        return bindY;
+    }
 
-    @Override public Vector3f bindEulerRotation() { return new Vector3f(bindEulerRotation); }
+    @Override
+    public float bindZ() {
+        return bindZ;
+    }
 
-    public Map<String, LocatorData> locators() { return locators; }
+    @Override
+    public Quaternionf bindRotation() {
+        return new Quaternionf(bindRotation);
+    }
 
-    public ICube[] cubes() { return cubes; }
+    @Override
+    public Vector3f bindEulerRotation() {
+        return new Vector3f(bindEulerRotation);
+    }
 
-    public PolyMesh[] polyMeshes() { return polyMeshes; }
+    public Map<String, LocatorData> locators() {
+        return locators;
+    }
 
-    public boolean hasQuadsInTree() { return hasQuadsInTree; }
+    public ICube[] cubes() {
+        return cubes;
+    }
 
-    public boolean hasVerticesInTree() { return hasVerticesInTree; }
+    public PolyMesh[] polyMeshes() {
+        return polyMeshes;
+    }
+
+    public boolean hasQuadsInTree() {
+        return hasQuadsInTree;
+    }
+
+    public boolean hasVerticesInTree() {
+        return hasVerticesInTree;
+    }
 
     public boolean hasQuads() {
         return cubes.length > 0;
@@ -98,6 +158,21 @@ public final class TreeBoneDefinition implements RuntimeBoneDefinition {
 
     public boolean hasVertices() {
         return TreeGeometryWriter.hasTriangles(polyMeshes);
+    }
+
+    @Override
+    public boolean rotateAroundPivot() {
+        return false;
+    }
+
+    @ApiStatus.Internal
+    void linkReferences(TreeBoneDefinition[] bones) {
+        parent = parentIndex < 0 ? null : bones[parentIndex];
+        TreeBoneDefinition[] linkedChildren = new TreeBoneDefinition[children.length];
+        for (int i = 0; i < children.length; i++) {
+            linkedChildren[i] = bones[children[i]];
+        }
+        childBones = linkedChildren;
     }
 
     @ApiStatus.Internal

@@ -9,7 +9,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 public class BoneState {
-    private final RuntimeBoneDefinition definition;
+    private final BoneDefinition definition;
     public float x;
     public float y;
     public float z;
@@ -21,12 +21,12 @@ public class BoneState {
     public boolean visible = true;
     public boolean illuminated = false;
 
-    BoneState(RuntimeBoneDefinition definition) {
+    BoneState(BoneDefinition definition) {
         this.definition = definition;
         reset();
     }
 
-    public RuntimeBoneDefinition definition() {
+    public BoneDefinition definition() {
         return definition;
     }
 
@@ -84,10 +84,15 @@ public class BoneState {
         if (x != 0 || y != 0 || z != 0) {
             matrix.translate(x / 16.0F, y / 16.0F, z / 16.0F);
         }
-        matrix.translate(definition.pivotX(), definition.pivotY(), definition.pivotZ());
-        matrix.rotate(rotation);
-        matrix.scale(xScale, yScale, zScale);
-        matrix.translate(-definition.pivotX(), -definition.pivotY(), -definition.pivotZ());
+        if (definition.rotateAroundPivot()) {
+            matrix.translate(definition.pivotX(), definition.pivotY(), definition.pivotZ());
+            matrix.rotate(rotation);
+            matrix.scale(xScale, yScale, zScale);
+            matrix.translate(-definition.pivotX(), -definition.pivotY(), -definition.pivotZ());
+        } else {
+            matrix.rotate(rotation);
+            matrix.scale(xScale, yScale, zScale);
+        }
         return matrix;
     }
 

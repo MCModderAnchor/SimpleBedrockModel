@@ -18,7 +18,7 @@ public abstract class BoneTreeInstance implements Skeleton {
     private final BoneState[] bones;
     private final Pose bindPose;
 
-    protected BoneTreeInstance(RuntimeBoneDefinition[] definitions, Pose bindPose) {
+    protected BoneTreeInstance(BoneDefinition[] definitions, Pose bindPose) {
         this.bindPose = bindPose;
         this.bones = new BoneState[definitions.length];
         for (int i = 0; i < bones.length; i++) {
