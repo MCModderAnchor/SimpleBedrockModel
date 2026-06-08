@@ -139,13 +139,12 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
     }
 
     private static void prepareCubeVertices(ICube cube, Matrix4f pose) {
-        float inflate = cube.inflate();
-        float x = (cube.x() - inflate) / 16.0f;
-        float y = (cube.y() - inflate) / 16.0f;
-        float z = (cube.z() - inflate) / 16.0f;
-        float width = (cube.width() + inflate * 2.0f) / 16.0f;
-        float height = (cube.height() + inflate * 2.0f) / 16.0f;
-        float depth = (cube.depth() + inflate * 2.0f) / 16.0f;
+        float x = cube.x();
+        float y = cube.y();
+        float z = cube.z();
+        float width = cube.width();
+        float height = cube.height();
+        float depth = cube.depth();
 
         float exx = pose.m00() * width;
         float exy = pose.m01() * width;
@@ -173,9 +172,9 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
         if (!cube.hasRotation()) return;
         float[] pivot = cube.pivot();
         Quaternionf rotation = cube.rotation();
-        pose.translate(pivot[0] / 16.0f, pivot[1] / 16.0f, pivot[2] / 16.0f);
+        pose.translate(pivot[0], pivot[1], pivot[2]);
         pose.rotate(rotation);
-        pose.translate(-pivot[0] / 16.0f, -pivot[1] / 16.0f, -pivot[2] / 16.0f);
+        pose.translate(-pivot[0], -pivot[1], -pivot[2]);
         normal.rotate(rotation);
     }
 

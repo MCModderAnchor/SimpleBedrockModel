@@ -88,20 +88,24 @@ public class TreeBedrockModelBaker {
                 cubeRotation[2] = (float) Math.toRadians(cubeRotation[2]);
                 rotation = new Quaternionf().rotateZYX(cubeRotation[2], cubeRotation[1], cubeRotation[0]);
             }
-            float x = origin[0] - bone.absolutePivotX;
-            float y = origin[1] - bone.absolutePivotY;
-            float z = origin[2] - bone.absolutePivotZ;
+            float inflate = cube.getInflate();
+            float x = (origin[0] - bone.absolutePivotX - inflate) / 16.0f;
+            float y = (origin[1] - bone.absolutePivotY - inflate) / 16.0f;
+            float z = (origin[2] - bone.absolutePivotZ - inflate) / 16.0f;
+            float width = (size[0] + inflate * 2.0f) / 16.0f;
+            float height = (size[1] + inflate * 2.0f) / 16.0f;
+            float depth = (size[2] + inflate * 2.0f) / 16.0f;
             if (pivot != null) {
-                pivot[0] -= bone.absolutePivotX;
-                pivot[1] -= bone.absolutePivotY;
-                pivot[2] -= bone.absolutePivotZ;
+                pivot[0] = (pivot[0] - bone.absolutePivotX) / 16.0f;
+                pivot[1] = (pivot[1] - bone.absolutePivotY) / 16.0f;
+                pivot[2] = (pivot[2] - bone.absolutePivotZ) / 16.0f;
             }
             if (cube.getFaceUv() == null) {
                 float[] uv = cube.getUv();
                 boolean mirror = cube.isHasMirror() ? cube.isMirror() : boneItem.isMirror();
-                cubes.add(new CubeBox(x, y, z, size[0], size[1], size[2], cube.getInflate(), createBoxUvs(uv[0], uv[1], size[0], size[1], size[2], texWidth, texHeight), mirror ? UV_ORDER_MIRRORED : UV_ORDER_NO_MIRROR, pivot, rotation));
+                cubes.add(new CubeBox(x, y, z, width, height, depth, 0.0f, createBoxUvs(uv[0], uv[1], size[0], size[1], size[2], texWidth, texHeight), mirror ? UV_ORDER_MIRRORED : UV_ORDER_NO_MIRROR, pivot, rotation));
             } else {
-                cubes.add(new CubePerFace(x, y, z, size[0], size[1], size[2], cube.getInflate(), createPerFaceUvs(cube.getFaceUv(), texWidth, texHeight), createEmptyFacesMask(cube.getFaceUv()), pivot, rotation));
+                cubes.add(new CubePerFace(x, y, z, width, height, depth, 0.0f, createPerFaceUvs(cube.getFaceUv(), texWidth, texHeight), createEmptyFacesMask(cube.getFaceUv()), pivot, rotation));
             }
         }
         return cubes.toArray(ICube[]::new);
