@@ -4,11 +4,12 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockA
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoader;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoaders;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerOptions;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationFactory;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationEntry;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationFactory;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelBakeContext;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelEntry;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResource;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.ModelType;
 import com.google.common.collect.Maps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
@@ -35,12 +36,46 @@ public class RegisterV2BedrockResourcesEvent extends Event implements IModBusEve
         this.dist = dist;
     }
 
-    public ModelBuilder model(ResourceLocation modelId) {
-        return model(modelId, RawResourceLoaders.COMMON_LOADER);
+    public ModelBuilder treeModel(ResourceLocation modelId) {
+        return treeModel(modelId, modelId);
     }
 
+    public ModelBuilder treeModel(ResourceLocation modelId, ResourceLocation sourceId) {
+        return treeModel(modelId, sourceId, RawResourceLoaders.COMMON_LOADER);
+    }
+
+    public ModelBuilder treeModel(ResourceLocation modelId, ResourceLocation sourceId, RawResourceLoader modelLoader) {
+        return new ModelBuilder(modelId, sourceId, modelLoader, ModelType.TREE);
+    }
+
+    public ModelBuilder bakedModel(ResourceLocation modelId) {
+        return bakedModel(modelId, modelId);
+    }
+
+    public ModelBuilder bakedModel(ResourceLocation modelId, ResourceLocation sourceId) {
+        return bakedModel(modelId, sourceId, RawResourceLoaders.COMMON_LOADER);
+    }
+
+    public ModelBuilder bakedModel(ResourceLocation modelId, ResourceLocation sourceId, RawResourceLoader modelLoader) {
+        return new ModelBuilder(modelId, sourceId, modelLoader, ModelType.BAKED);
+    }
+
+    /**
+     * @deprecated Use {@link #bakedModel(ResourceLocation)} or {@link #treeModel(ResourceLocation)} to make the
+     * runtime model type explicit.
+     */
+    @Deprecated
+    public ModelBuilder model(ResourceLocation modelId) {
+        return bakedModel(modelId);
+    }
+
+    /**
+     * @deprecated Use {@link #bakedModel(ResourceLocation, ResourceLocation, RawResourceLoader)} or
+     * {@link #treeModel(ResourceLocation, ResourceLocation, RawResourceLoader)} to make the runtime model type explicit.
+     */
+    @Deprecated
     public ModelBuilder model(ResourceLocation modelId, RawResourceLoader modelLoader) {
-        return new ModelBuilder(modelId, modelLoader);
+        return bakedModel(modelId, modelId, modelLoader);
     }
 
     public void onReload(Consumer<Map<ResourceLocation, BedrockModelResource>> listener) {
@@ -65,28 +100,22 @@ public class RegisterV2BedrockResourcesEvent extends Event implements IModBusEve
 
     public final class ModelBuilder {
         private final ResourceLocation modelId;
+        private final ResourceLocation sourceId;
         private final RawResourceLoader modelLoader;
+        private final ModelType kind;
         private final LinkedHashMap<ResourceLocation, AnimationRegistration> animations = new LinkedHashMap<>();
         private Function<BedrockModelBakeContext, BakerOptions> optionsFactory;
         private boolean lazy;
-        private boolean preserveLegacyArmorCopy;
 
-        private ModelBuilder(ResourceLocation modelId, RawResourceLoader modelLoader) {
+        private ModelBuilder(ResourceLocation modelId, ResourceLocation sourceId, RawResourceLoader modelLoader, ModelType kind) {
             this.modelId = modelId;
+            this.sourceId = sourceId;
             this.modelLoader = modelLoader;
+            this.kind = kind;
         }
 
         public ModelBuilder lazy() {
             this.lazy = true;
-            return this;
-        }
-
-        /**
-         * Marks this v2 model as needing a legacy v1 armor-model copy for Epic Fight conversion.
-         * The copy is created only when Epic Fight is actually installed and the model resource is built.
-         */
-        public ModelBuilder preserveLegacyArmorCopyForEpicFight() {
-            this.preserveLegacyArmorCopy = true;
             return this;
         }
 
@@ -116,7 +145,8 @@ public class RegisterV2BedrockResourcesEvent extends Event implements IModBusEve
             Function<BedrockModelBakeContext, BakerOptions> factory = optionsFactory != null
                     ? optionsFactory
                     : context -> animations.isEmpty() ? BakerOptions.defaults() : context.optionsFromAnimations();
-            modelRegistry.put(modelId, new BedrockModelEntry(modelLoader, factory, new ArrayList<>(animations.keySet()), lazy, preserveLegacyArmorCopy));
+            modelRegistry.put(modelId, new BedrockModelEntry(
+                    modelLoader, sourceId, kind, factory, new ArrayList<>(animations.keySet()), lazy));
             for (Map.Entry<ResourceLocation, AnimationRegistration> entry : animations.entrySet()) {
                 AnimationRegistration animation = entry.getValue();
                 animationRegistry.put(entry.getKey(), new BedrockAnimationEntry(

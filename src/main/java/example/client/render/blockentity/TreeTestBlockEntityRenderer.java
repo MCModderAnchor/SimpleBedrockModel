@@ -2,7 +2,6 @@ package example.client.render.blockentity;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
@@ -15,7 +14,6 @@ import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import example.animation.MolangTestAnimationContext;
 import example.animation.TestBlockAnimationContext;
 import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
@@ -50,7 +48,7 @@ public class TreeTestBlockEntityRenderer implements BlockEntityRenderer<TestBloc
     }
 
     private TreeBedrockModel loadTestModel() {
-        TreeBedrockModel model = loadTreeModel(KnownResources.TEST);
+        TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(KnownResources.TEST);
         BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.TEST);
         if (model != null && animationFile != null) {
             TestBlockAnimationContext.initialize(animationFile, model);
@@ -59,12 +57,7 @@ public class TreeTestBlockEntityRenderer implements BlockEntityRenderer<TestBloc
     }
 
     private TreeBedrockModel loadPolyMeshTestModel() {
-        return loadTreeModel(KnownResources.POLY_MESH_TEST);
-    }
-
-    private TreeBedrockModel loadTreeModel(ResourceLocation location) {
-        BedrockModelPOJO pojo = BedrockModelResources.getInstance().getModelPojo(location);
-        return pojo == null ? null : TreeBedrockModel.bake(pojo);
+        return BedrockModelResources.getInstance().getTreeModel(KnownResources.POLY_MESH_TEST);
     }
 
     @Override
@@ -85,8 +78,6 @@ public class TreeTestBlockEntityRenderer implements BlockEntityRenderer<TestBloc
             animationInstance.renderTick();
             Pose animationPose = animationInstance.getStateMachine().getPose();
 
-//            MolangTestAnimationContext.tick();
-//            Pose animationPose = MolangTestAnimationContext.evaluatePose();
             if (animationPose != null) {
                 Pose blended = BLENDER.blend(instance.getBindPose(), animationPose);
                 instance.applyPose(blended);

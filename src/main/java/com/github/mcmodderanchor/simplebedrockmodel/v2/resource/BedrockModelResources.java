@@ -1,13 +1,13 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.resource;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.epicfight.EpicFightCompat;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerOptions;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.google.common.collect.Maps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -33,7 +33,6 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
     private final List<Consumer<Map<ResourceLocation, BedrockModelResource>>> listeners;
     private final Map<ResourceLocation, Optional<BedrockModelPOJO>> pojoCache;
     private final Map<ResourceLocation, Optional<BedrockModelResource>> resourceCache;
-    private final Map<ResourceLocation, Optional<BedrockArmorModel>> legacyArmorCache;
     @Nullable
     private ResourceManager resourceManager;
 
@@ -49,7 +48,6 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         this.listeners = List.copyOf(listeners);
         this.pojoCache = Maps.newHashMap();
         this.resourceCache = Maps.newHashMap();
-        this.legacyArmorCache = Maps.newHashMap();
     }
 
     @Override
@@ -61,7 +59,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
             if (processor.lazy()) {
                 return;
             }
-            result.put(location, loadModelPojo(resourceManager, location, processor));
+            result.put(location, loadModelPojo(resourceManager, processor));
         });
         return result;
     }
@@ -72,7 +70,6 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         this.resourceManager = resourceManager;
         pojoCache.clear();
         resourceCache.clear();
-        legacyArmorCache.clear();
         pojoCache.putAll(prepared);
         processors.forEach((location, processor) -> {
             if (processor.lazy()) {
@@ -82,8 +79,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
             if (pojo == null || pojo.isEmpty()) {
                 return;
             }
-            createLegacyArmorCopyIfEnabled(location, processor, pojo.get());
-            resourceCache.put(location, createResource(location, processor, pojo.get()));
+            resourceCache.put(location, createModelResource(location, processor, pojo.get()));
         });
         Map<ResourceLocation, BedrockModelResource> resources = getAllResources();
         for (Consumer<Map<ResourceLocation, BedrockModelResource>> listener : listeners) {
@@ -107,16 +103,28 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
             resourceCache.put(location, Optional.empty());
             return null;
         }
-        createLegacyArmorCopyIfEnabled(location, processor, pojo);
-        Optional<BedrockModelResource> resource = createResource(location, processor, pojo);
+        Optional<BedrockModelResource> resource = createModelResource(location, processor, pojo);
         resourceCache.put(location, resource);
         return resource.orElse(null);
     }
 
+
     @Nullable
-    public synchronized BakedBedrockModel getModel(ResourceLocation location) {
+    public synchronized BakedBedrockModel getBakedModel(ResourceLocation location) {
         BedrockModelResource resource = getResource(location);
-        return resource == null ? null : resource.model();
+        if (resource == null || resource.kind() != ModelType.BAKED) {
+            return null;
+        }
+        return (BakedBedrockModel) resource.model();
+    }
+
+    @Nullable
+    public synchronized TreeBedrockModel getTreeModel(ResourceLocation location) {
+        BedrockModelResource resource = getResource(location);
+        if (resource == null || resource.kind() != ModelType.TREE) {
+            return null;
+        }
+        return (TreeBedrockModel) resource.model();
     }
 
     @Nullable
@@ -140,39 +148,19 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
             SimpleBedrockModel.LOGGER.error("Cannot lazy load v2 model before resource reload is applied: {}", location);
             return null;
         }
-        Optional<BedrockModelPOJO> pojo = loadModelPojo(resourceManager, location, processor);
+        Optional<BedrockModelPOJO> pojo = loadModelPojo(resourceManager, processor);
         pojoCache.put(location, pojo);
         return pojo.orElse(null);
-    }
-
-    @Nullable
-    public synchronized BedrockArmorModel getLegacyArmorCopyForEpicFight(ResourceLocation location) {
-        Optional<BedrockArmorModel> cached = legacyArmorCache.get(location);
-        if (cached != null) {
-            return cached.orElse(null);
-        }
-        BedrockModelEntry processor = processors.get(location);
-        if (processor == null || !processor.preserveLegacyArmorCopy()) {
-            return null;
-        }
-        BedrockModelPOJO pojo = getModelPojo(location);
-        if (pojo == null) {
-            legacyArmorCache.put(location, Optional.empty());
-            return null;
-        }
-        return createLegacyArmorCopyIfEnabled(location, processor, pojo);
     }
 
     public synchronized void clearLoaded(ResourceLocation location) {
         pojoCache.remove(location);
         resourceCache.remove(location);
-        legacyArmorCache.remove(location);
     }
 
     public synchronized void clearLoaded() {
         pojoCache.clear();
         resourceCache.clear();
-        legacyArmorCache.clear();
     }
 
     @UnmodifiableView
@@ -185,54 +173,54 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
     }
 
     @UnmodifiableView
-    public Map<ResourceLocation, BakedBedrockModel> getAllModels() {
+    public Map<ResourceLocation, BakedBedrockModel> getAllBakedModels() {
         Map<ResourceLocation, BakedBedrockModel> result = new LinkedHashMap<>();
         for (Map.Entry<ResourceLocation, BedrockModelResource> entry : getAllResources().entrySet()) {
-            result.put(entry.getKey(), entry.getValue().model());
+            if (entry.getValue().kind() == ModelType.BAKED) {
+                result.put(entry.getKey(), (BakedBedrockModel) entry.getValue().model());
+            }
         }
         return Collections.unmodifiableMap(result);
     }
 
     @UnmodifiableView
-    public Map<ResourceLocation, Optional<BedrockModelPOJO>> getAllModelPojos() {
+    public Map<ResourceLocation, TreeBedrockModel> getAllTreeModels() {
+        Map<ResourceLocation, TreeBedrockModel> result = new LinkedHashMap<>();
+        for (Map.Entry<ResourceLocation, BedrockModelResource> entry : getAllResources().entrySet()) {
+            if (entry.getValue().kind() == ModelType.TREE) {
+                result.put(entry.getKey(), (TreeBedrockModel) entry.getValue().model());
+            }
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    @UnmodifiableView
+    public Map<ResourceLocation, Optional<BedrockModelPOJO>> getModelPojos() {
         return Collections.unmodifiableMap(pojoCache);
     }
 
-    @Nullable
-    private BedrockArmorModel createLegacyArmorCopyIfEnabled(ResourceLocation location, BedrockModelEntry processor, BedrockModelPOJO pojo) {
-        if (!processor.preserveLegacyArmorCopy() || !EpicFightCompat.isLoaded()) {
-            return null;
-        }
-        Optional<BedrockArmorModel> cached = legacyArmorCache.get(location);
-        if (cached != null) {
-            return cached.orElse(null);
-        }
+    private Optional<BedrockModelResource> createModelResource(ResourceLocation location, BedrockModelEntry processor, BedrockModelPOJO pojo) {
         try {
-            BedrockArmorModel legacyArmor = new BedrockArmorModel(pojo);
-            legacyArmorCache.put(location, Optional.of(legacyArmor));
-            return legacyArmor;
-        } catch (RuntimeException e) {
-            SimpleBedrockModel.LOGGER.error("Failed to create v1 armor copy for Epic Fight: {}", location, e);
-            legacyArmorCache.put(location, Optional.empty());
-            return null;
-        }
-    }
-
-    private Optional<BedrockModelResource> createResource(ResourceLocation location, BedrockModelEntry processor, BedrockModelPOJO pojo) {
-        try {
-            List<BedrockAnimationFile> animationFiles = collectAnimationFiles(location, processor);
-            BedrockModelBakeContext context = new BedrockModelBakeContext(location, pojo, animationFiles);
-            BakerOptions options = processor.optionsFactory().apply(context);
-            if (options == null) {
-                options = BakerOptions.defaults();
-            }
-            BakedBedrockModel model = BakedBedrockModel.bake(pojo, options);
+            BoneIndexProvider model = switch (processor.kind()) {
+                case BAKED -> createBakedModel(location, processor, pojo);
+                case TREE -> TreeBedrockModel.bake(pojo);
+            };
             Map<ResourceLocation, List<BedrockAnimation>> animations = createAnimations(processor, model);
-            return Optional.of(new BedrockModelResource(model, animations));
+            return Optional.of(new BedrockModelResource(model, processor.kind(), animations));
         } catch (RuntimeException e) {
             SimpleBedrockModel.LOGGER.error("Failed to create v2 model resource: {}", location, e);
             return Optional.empty();
         }
+    }
+
+    private BakedBedrockModel createBakedModel(ResourceLocation location, BedrockModelEntry processor, BedrockModelPOJO pojo) {
+        List<BedrockAnimationFile> animationFiles = collectAnimationFiles(location, processor);
+        BedrockModelBakeContext context = new BedrockModelBakeContext(location, pojo, animationFiles);
+        BakerOptions options = processor.optionsFactory().apply(context);
+        if (options == null) {
+            options = BakerOptions.defaults();
+        }
+        return BakedBedrockModel.bake(pojo, options);
     }
 
     private List<BedrockAnimationFile> collectAnimationFiles(ResourceLocation modelId, BedrockModelEntry processor) {
@@ -254,7 +242,7 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         return files;
     }
 
-    private Map<ResourceLocation, List<BedrockAnimation>> createAnimations(BedrockModelEntry modelProcessor, BakedBedrockModel model) {
+    private Map<ResourceLocation, List<BedrockAnimation>> createAnimations(BedrockModelEntry modelProcessor, BoneIndexProvider model) {
         if (modelProcessor.animationSourceIds().isEmpty()) {
             return Map.of();
         }
@@ -280,9 +268,8 @@ public class BedrockModelResources extends SimplePreparableReloadListener<Map<Re
         return animations;
     }
 
-    private static Optional<BedrockModelPOJO> loadModelPojo(ResourceManager resourceManager, ResourceLocation location,
-                                                            BedrockModelEntry processor) {
-        ResourceLocation path = modelPath(location);
+    private static Optional<BedrockModelPOJO> loadModelPojo(ResourceManager resourceManager, BedrockModelEntry processor) {
+        ResourceLocation path = modelPath(processor.sourceId());
         return resourceManager.getResource(path).map(resource -> {
             try (InputStream stream = resource.open()) {
                 return Optional.ofNullable(processor.rawLoader().load(stream, BedrockModelPOJO.class));

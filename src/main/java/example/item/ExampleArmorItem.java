@@ -1,8 +1,7 @@
 package example.item;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer.GeoArmorRendererV2;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import example.resource.InnerResourceLoader;
 import net.minecraft.client.model.HumanoidModel;
@@ -33,12 +32,10 @@ public class ExampleArmorItem extends ArmorItem {
             public @NotNull HumanoidModel<?> getHumanoidArmorModel(LivingEntity livingEntity, ItemStack itemStack, EquipmentSlot equipmentSlot, HumanoidModel<?> original) {
                 if (this.renderer == null) {
                     BedrockModelResources resources = BedrockModelResources.getInstance();
-                    BakedBedrockModel model = resources.getModel(InnerResourceLoader.DEFENDER);
-                    BedrockArmorModel legacyArmorModel = resources.getLegacyArmorCopyForEpicFight(InnerResourceLoader.DEFENDER);
+                    TreeBedrockModel model = resources.getTreeModel(InnerResourceLoader.DEFENDER);
                     this.renderer = new GeoArmorRendererV2(
                             model,
                             ExampleArmorItem.this.getEquipmentSlot(),
-                            legacyArmorModel,
                             new ResourceLocation("example", "textures/armor/defender.png")
                     );
                 }

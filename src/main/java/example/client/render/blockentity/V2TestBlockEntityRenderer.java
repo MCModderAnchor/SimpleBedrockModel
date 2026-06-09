@@ -48,7 +48,7 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
     }
 
     private BakedBedrockModel loadTestModel() {
-        BakedBedrockModel model = BedrockModelResources.getInstance().getModel(KnownResources.TEST);
+        BakedBedrockModel model = BedrockModelResources.getInstance().getBakedModel(KnownResources.TEST);
         BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.TEST);
         if (model != null && animationFile != null) {
             TestBlockAnimationContext.initialize(animationFile, model);
@@ -57,7 +57,7 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
     }
 
     private BakedBedrockModel loadPolyMeshTestModel() {
-        return BedrockModelResources.getInstance().getModel(KnownResources.POLY_MESH_TEST);
+        return BedrockModelResources.getInstance().getBakedModel(KnownResources.POLY_MESH_TEST);
     }
 
     @Override

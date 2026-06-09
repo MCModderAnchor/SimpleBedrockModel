@@ -3,15 +3,14 @@ package example.resource;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnimationEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelEvent;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.MochaEngine;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.resource.RawResourceLoaders;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerOptions;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.event.RegisterV2BedrockResourcesEvent;
 import example.animation.MolangTestAnimationContext;
 import example.init.ExampleModRegister;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.MochaEngine;
 
 import java.util.ArrayList;
 
@@ -61,20 +60,17 @@ public class KnownResources {
 
     @SubscribeEvent
     public static void onV2ResourceRegister(RegisterV2BedrockResourcesEvent event) {
-        event.model(TEST)
+        event.treeModel(TEST)
                 .animation(TEST)
                 .animation(MOLANG_TEST, (file, model) -> BedrockAnimation.createAnimation(file, model, MolangTestAnimationContext.getSharedEngine()))
                 .register();
-        event.model(POLY_MESH_TEST).register();
-        event.model(ZTI_MODEL)
+        event.treeModel(POLY_MESH_TEST).register();
+        event.bakedModel(ZTI_MODEL)
                 .animation(ZTI_ANIMATION)
                 .register();
-        event.model(InnerResourceLoader.DEFENDER)
-                .options(BakerOptions.ARMOR)
-                .preserveLegacyArmorCopyForEpicFight()
-                .register();
+        event.treeModel(InnerResourceLoader.DEFENDER).register();
         for (ResourceLocation resourceLocation : ANIMATION_AND_MODEL) {
-            event.model(resourceLocation)
+            event.bakedModel(resourceLocation)
                     .animation(resourceLocation)
                     .register();
         }

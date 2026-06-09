@@ -47,7 +47,7 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
     }
 
     private BakedBedrockModel loadModel() {
-        BakedBedrockModel model = BedrockModelResources.getInstance().getModel(KnownResources.ZTI_MODEL);
+        BakedBedrockModel model = BedrockModelResources.getInstance().getBakedModel(KnownResources.ZTI_MODEL);
         BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.ZTI_ANIMATION);
         if (model == null || animationFile == null) {
             return null;

@@ -9,10 +9,11 @@ import java.util.function.Function;
 
 public record BedrockModelEntry(
         RawResourceLoader rawLoader,
+        ResourceLocation sourceId,
+        ModelType kind,
         Function<BedrockModelBakeContext, BakerOptions> optionsFactory,
         List<ResourceLocation> animationSourceIds,
-        boolean lazy,
-        boolean preserveLegacyArmorCopy
+        boolean lazy
 ) {
     public BedrockModelEntry {
         animationSourceIds = List.copyOf(animationSourceIds);

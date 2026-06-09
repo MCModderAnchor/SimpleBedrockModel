@@ -1,15 +1,11 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v1.client.handler;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.GeoArmorRenderer;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.IFPArmorHandRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.ItemStack;
@@ -20,8 +16,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
-
-import java.util.ArrayDeque;
 
 /**
  * 通用的第一人称盔甲手臂渲染处理器。
@@ -51,24 +45,9 @@ public class FirstPersonArmorHandler {
 
         IClientItemExtensions ext = IClientItemExtensions.of(chestStack.getItem());
         var model = ext.getHumanoidArmorModel(player, chestStack, EquipmentSlot.CHEST, getDefaultModel());
-        if (!(model instanceof GeoArmorRenderer geoRenderer)) return;
+        if (!(model instanceof IFPArmorHandRenderer armorRenderer)) return;
 
-        BedrockBone armBone = arm == HumanoidArm.RIGHT
-                ? geoRenderer.getModel().getArmorRightArm()
-                : geoRenderer.getModel().getArmorLeftArm();
-        if (armBone == null) return;
-
-        RenderType renderType = geoRenderer.getRenderType(geoRenderer.getTexture());
-        VertexConsumer consumer = event.getMultiBufferSource().getBuffer(renderType);
-
-        PoseStack poseStack = event.getPoseStack();
-        poseStack.pushPose();
-
-        poseStack.mulPoseMatrix(getGlobalTransform(armBone));
-
-        armBone.render(poseStack, consumer, event.getPackedLight(), OverlayTexture.NO_OVERLAY);
-
-        poseStack.popPose();
+        armorRenderer.renderFirstPersonArmorArm(player, arm, event.getPoseStack(), event.getMultiBufferSource(), event.getPackedLight());
     }
 
     // 取得骨骼除了自身变换以外的全局变换矩阵

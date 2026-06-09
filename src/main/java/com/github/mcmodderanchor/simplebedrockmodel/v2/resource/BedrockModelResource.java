@@ -1,7 +1,7 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.resource;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation.BedrockAnimation;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 public record BedrockModelResource(
-        BakedBedrockModel model,
+        BoneIndexProvider model,
+        ModelType kind,
         Map<ResourceLocation, List<BedrockAnimation>> animations
 ) {
     public BedrockModelResource {
