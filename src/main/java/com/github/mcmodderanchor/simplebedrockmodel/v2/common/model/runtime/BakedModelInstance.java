@@ -2,8 +2,8 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneLocator;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.QueryTransform;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BoneLocator;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.QueryTransform;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;

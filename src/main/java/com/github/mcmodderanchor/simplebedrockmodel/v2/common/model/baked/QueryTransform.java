@@ -1,4 +1,4 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 import org.joml.Matrix4f;
 

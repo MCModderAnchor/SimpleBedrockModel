@@ -2,8 +2,6 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneLocator;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.QueryTransform;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneState;
 import com.maydaymemory.mae.basic.Pose;
