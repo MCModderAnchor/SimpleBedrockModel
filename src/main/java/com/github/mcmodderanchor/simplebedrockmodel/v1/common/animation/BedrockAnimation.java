@@ -3,6 +3,8 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.common.animation;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.BoneIndexProvider;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.ParticleEffectDataKeyframe;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.ResourceLocationKeyframe;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.TimelineEvent;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.common.TimelineKeyframe;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.molang.MolangEngineHelper;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangExpression;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.*;
@@ -22,6 +24,7 @@ public class BedrockAnimation extends BasicAnimation {
     private static final float DEGREE_TO_ANGLE = (float) (Math.PI / 180);
     public static final String SOUND_CHANNEL_NAME = "sound_effects";
     public static final String PARTICLE_CHANNEL_NAME = "particle_effects";
+    public static final String TIMELINE_CHANNEL_NAME = "timeline";
 
     private float specifiedEndTimeS = -1;
 
@@ -74,6 +77,21 @@ public class BedrockAnimation extends BasicAnimation {
                 keyframes.add(new ParticleEffectDataKeyframe((float) entry.getDoubleKey(), entry.getValue()));
             }
             animation.setClipChannel(PARTICLE_CHANNEL_NAME, new ArrayClipChannel<>(keyframes));
+        }
+        TimelineKeyframes timeline = pojo.getTimeline();
+        if (timeline != null && timeline.getKeyframes() != null && molangEngine != null) {
+            ArrayList<Keyframe<TimelineEvent>> keyframes = new ArrayList<>();
+            for (Double2ObjectMap.Entry<List<String>> entry : timeline.getKeyframes().double2ObjectEntrySet()) {
+                List<String> raw = entry.getValue();
+                List<MolangExpression> compiled = new ArrayList<>(raw.size());
+                for (String command : raw) {
+                    compiled.add(MolangEngineHelper.compileExpression(molangEngine, command));
+                }
+                keyframes.add(new TimelineKeyframe((float) entry.getDoubleKey(), new TimelineEvent(raw, compiled)));
+            }
+            if (!keyframes.isEmpty()) {
+                animation.setClipChannel(TIMELINE_CHANNEL_NAME, new ArrayClipChannel<>(keyframes));
+            }
         }
         float animationLength = (float) pojo.getAnimationLength();
         animation.setSpecifiedEndTimeS(animationLength);
