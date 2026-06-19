@@ -2,13 +2,17 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.animation.IFPAnimationInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.firstperson.FirstPersonParticleSystem;
+import com.maydaymemory.mae.basic.YXZRotationView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.client.event.ViewportEvent;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
+import org.joml.Vector3fc;
 
 public interface IFPGeoItemRenderer {
 
@@ -27,6 +31,34 @@ public interface IFPGeoItemRenderer {
 
     default boolean blockOffhandRender() {
         return false;
+    }
+
+    /**
+     * 使用该渲染器的物品会阻止原版的 viewBobbing，以便应用自定义的跑步/走路动画。
+     *
+     * @return 是否阻止原版 viewBobbing
+     */
+    default boolean blockViewBobbing() {
+        return true;
+    }
+
+    /**
+     * 应用摄像机动画对世界的变换（只有旋转生效）。
+     */
+    default void applyLevelCameraAnimation(ViewportEvent.ComputeCameraAngles event, ItemStack stack, Quaternionf animateRot, float partialTicks) {
+        Quaternionf initialRotation = new Quaternionf().rotateYXZ(-event.getYaw(), -event.getPitch(), -event.getRoll());
+        YXZRotationView rotationView = new YXZRotationView(initialRotation.mul(animateRot));
+        Vector3fc eulerAngle = rotationView.asEulerAngle();
+        event.setYaw(-eulerAngle.y());
+        event.setPitch(-eulerAngle.x());
+        event.setRoll(-eulerAngle.z());
+    }
+
+    /**
+     * 应用摄像机动画对手持物品的变换（只有旋转生效）。
+     */
+    default void applyItemInHandCameraAnimation(PoseStack poseStack, ItemStack stack, Quaternionf animateRot, float partialTicks) {
+        poseStack.mulPose(animateRot);
     }
 
     /**
