@@ -134,7 +134,13 @@ public class BakedBedrockModel implements BoneIndexProvider {
     @OnlyIn(Dist.CLIENT)
     public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
                                float red, float green, float blue, float alpha) {
-        renderBoneTree(instance, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha, true);
+        renderToBuffer(instance, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
+                               float red, float green, float blue, float alpha, boolean skipNormalVisibilityCull) {
+        renderBoneTree(instance, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha, true, skipNormalVisibilityCull);
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -147,22 +153,37 @@ public class BakedBedrockModel implements BoneIndexProvider {
     @OnlyIn(Dist.CLIENT)
     public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
                                RenderType triangleRenderType, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
+        renderToBuffer(instance, poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay,
+                red, green, blue, alpha, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderToBuffer(BakedModelInstance instance, PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
+                               RenderType triangleRenderType, int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
+                               boolean skipNormalVisibilityCull) {
         VertexConsumer quadConsumer = bufferSource.getBuffer(quadRenderType);
-        renderBoneTree(instance, poseStack, quadConsumer, packedLight, packedOverlay, red, green, blue, alpha, true);
+        renderBoneTree(instance, poseStack, quadConsumer, packedLight, packedOverlay, red, green, blue, alpha, true, skipNormalVisibilityCull);
         VertexConsumer triangleConsumer = bufferSource.getBuffer(triangleRenderType);
-        renderBoneTree(instance, poseStack, triangleConsumer, packedLight, packedOverlay, red, green, blue, alpha, false);
+        renderBoneTree(instance, poseStack, triangleConsumer, packedLight, packedOverlay, red, green, blue, alpha, false, skipNormalVisibilityCull);
     }
 
     @OnlyIn(Dist.CLIENT)
     public void renderBoneTree(BakedModelInstance instance, PoseStack poseStack, VertexConsumer consumer,
                                int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
                                boolean quadsPass) {
+        renderBoneTree(instance, poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderBoneTree(BakedModelInstance instance, PoseStack poseStack, VertexConsumer consumer,
+                               int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
+                               boolean quadsPass, boolean skipNormalVisibilityCull) {
         if (rootChunk != null) {
-            renderChunkForPass(rootChunk, poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass);
+            renderChunkForPass(rootChunk, poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass, skipNormalVisibilityCull);
         }
         for (BakedBoneDefinition bone : bones) {
             if (bone.parentIndex() < 0) {
-                renderBone(instance, bone.index(), poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass);
+                renderBone(instance, bone.index(), poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass, skipNormalVisibilityCull);
             }
         }
     }
@@ -171,6 +192,13 @@ public class BakedBedrockModel implements BoneIndexProvider {
     public void renderBone(BakedModelInstance instance, int boneIndex, PoseStack poseStack, VertexConsumer consumer,
                            int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
                            boolean quadsPass) {
+        renderBone(instance, boneIndex, poseStack, consumer, packedLight, packedOverlay, red, green, blue, alpha, quadsPass, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderBone(BakedModelInstance instance, int boneIndex, PoseStack poseStack, VertexConsumer consumer,
+                           int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
+                           boolean quadsPass, boolean skipNormalVisibilityCull) {
         BakedBoneDefinition def = bones[boneIndex];
         if (quadsPass ? !def.hasQuadsInTree() : !def.hasVerticesInTree()) {
             return;
@@ -186,11 +214,11 @@ public class BakedBedrockModel implements BoneIndexProvider {
 
         BakedGeometryChunk chunk = chunkByBone[boneIndex];
         if (chunk != null) {
-            renderChunkForPass(chunk, poseStack, consumer, light, packedOverlay, red, green, blue, alpha, quadsPass);
+            renderChunkForPass(chunk, poseStack, consumer, light, packedOverlay, red, green, blue, alpha, quadsPass, skipNormalVisibilityCull);
         }
 
         for (int childIndex : def.children()) {
-            renderBone(instance, childIndex, poseStack, consumer, light, packedOverlay, red, green, blue, alpha, quadsPass);
+            renderBone(instance, childIndex, poseStack, consumer, light, packedOverlay, red, green, blue, alpha, quadsPass, skipNormalVisibilityCull);
         }
 
         poseStack.popPose();
@@ -200,8 +228,15 @@ public class BakedBedrockModel implements BoneIndexProvider {
     public void renderChunkForPass(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer consumer,
                                     int lightmap, int overlay, float red, float green, float blue, float alpha,
                                     boolean quadsPass) {
+        renderChunkForPass(chunk, poseStack, consumer, lightmap, overlay, red, green, blue, alpha, quadsPass, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderChunkForPass(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer consumer,
+                                    int lightmap, int overlay, float red, float green, float blue, float alpha,
+                                    boolean quadsPass, boolean skipNormalVisibilityCull) {
         if (quadsPass) {
-            BakedGeometryChunkRenderer.INSTANCE.renderQuadChunk(chunk, poseStack, consumer, lightmap, overlay, red, green, blue, alpha);
+            BakedGeometryChunkRenderer.INSTANCE.renderQuadChunk(chunk, poseStack, consumer, lightmap, overlay, red, green, blue, alpha, skipNormalVisibilityCull);
         } else {
             BakedGeometryChunkRenderer.INSTANCE.renderVertexChunk(chunk, poseStack, consumer, lightmap, overlay, red, green, blue, alpha);
         }

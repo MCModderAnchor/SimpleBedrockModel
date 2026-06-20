@@ -32,17 +32,35 @@ public final class TreeGeometryWriter {
 
     public static boolean writeCubesSodium(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
                                            int light, int overlay, float red, float green, float blue, float alpha) {
-        return SodiumCompat.writeCubes(cubes, consumer, light, overlay, red, green, blue, alpha, poseMatrix, normalMatrix);
+        return writeCubesSodium(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha, false);
+    }
+
+    public static boolean writeCubesSodium(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                           int light, int overlay, float red, float green, float blue, float alpha,
+                                           boolean skipNormalVisibilityCull) {
+        return SodiumCompat.writeCubes(cubes, consumer, light, overlay, red, green, blue, alpha, poseMatrix, normalMatrix, skipNormalVisibilityCull);
     }
 
     public static void writeCubes(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
                                   int light, int overlay, float red, float green, float blue, float alpha) {
-        if (writeCubesSodium(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha)) return;
-        writeCubesFallback(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha);
+        writeCubes(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha, false);
+    }
+
+    public static void writeCubes(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                  int light, int overlay, float red, float green, float blue, float alpha,
+                                  boolean skipNormalVisibilityCull) {
+        if (writeCubesSodium(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha, skipNormalVisibilityCull)) return;
+        writeCubesFallback(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha, skipNormalVisibilityCull);
     }
 
     public static synchronized void writeCubesFallback(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
                                                        int light, int overlay, float red, float green, float blue, float alpha) {
+        writeCubesFallback(cubes, consumer, poseMatrix, normalMatrix, light, overlay, red, green, blue, alpha, false);
+    }
+
+    public static synchronized void writeCubesFallback(ICube[] cubes, VertexConsumer consumer, Matrix4f poseMatrix, Matrix3f normalMatrix,
+                                                       int light, int overlay, float red, float green, float blue, float alpha,
+                                                       boolean skipNormalVisibilityCull) {
         for (ICube cube : cubes) {
             CUBE_POSE.identity();
             CUBE_NORMAL_POSE.identity();

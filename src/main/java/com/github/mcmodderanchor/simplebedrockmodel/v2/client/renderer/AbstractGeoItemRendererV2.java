@@ -55,6 +55,15 @@ public abstract class AbstractGeoItemRendererV2 extends BlockEntityWithoutLevelR
                                         MultiBufferSource bufferSource, int light, int overlay, float partialTicks);
 
     /**
+     * 带法向可见性剔除控制的模型渲染钩子。子类可覆写该方法，并将参数传给 v2 instance 的 renderToBuffer。
+     */
+    protected void renderModel(PoseStack poseStack, ItemDisplayContext ctx, ItemStack stack,
+                               MultiBufferSource bufferSource, int light, int overlay, float partialTicks,
+                               boolean skipNormalVisibilityCull) {
+        renderModel(poseStack, ctx, stack, bufferSource, light, overlay, partialTicks);
+    }
+
+    /**
      * 渲染模型前调用。默认应用 GROUND / 非第一人称的中心偏移。可用于施加动画影响。
      */
     protected void beforeRender(PoseStack poseStack, ItemDisplayContext ctx, ItemStack stack, float partialTicks) {
@@ -70,6 +79,13 @@ public abstract class AbstractGeoItemRendererV2 extends BlockEntityWithoutLevelR
      */
     protected void afterRender(PoseStack poseStack, ItemDisplayContext ctx, ItemStack stack, MultiBufferSource bufferSource,
                                int light, float partialTicks) {
+    }
+
+    /**
+     * 是否跳过基于法向的简单可见性剔除。第一人称模型靠近相机时容易处在判断临界值附近，默认跳过以避免闪烁。
+     */
+    protected boolean skipNormalVisibilityCull(ItemDisplayContext ctx, ItemStack stack) {
+        return ctx.firstPerson();
     }
 
     @Override
@@ -100,7 +116,7 @@ public abstract class AbstractGeoItemRendererV2 extends BlockEntityWithoutLevelR
         }
         poseStack.pushPose();
         beforeRender(poseStack, ctx, stack, partialTicks);
-        renderModel(poseStack, ctx, stack, bufferSource, light, overlay, partialTicks);
+        renderModel(poseStack, ctx, stack, bufferSource, light, overlay, partialTicks, skipNormalVisibilityCull(ctx, stack));
         afterRender(poseStack, ctx, stack, bufferSource, light, partialTicks);
         poseStack.popPose();
     }

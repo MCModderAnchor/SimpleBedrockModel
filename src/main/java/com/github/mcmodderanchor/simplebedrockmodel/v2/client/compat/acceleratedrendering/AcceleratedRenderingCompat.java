@@ -15,7 +15,14 @@ public final class AcceleratedRenderingCompat {
 
     public static boolean renderQuads(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
                                       int lightmap, int overlay, float red, float green, float blue, float alpha) {
-        return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
+        return renderQuads(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha, false);
+    }
+
+    public static boolean renderQuads(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
+                                      int lightmap, int overlay, float red, float green, float blue, float alpha,
+                                      boolean skipNormalVisibilityCull) {
+        return !skipNormalVisibilityCull
+                && com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
                 && BackendHolder.RENDERER.renderQuads(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha);
     }
 
@@ -27,7 +34,14 @@ public final class AcceleratedRenderingCompat {
 
     public static boolean renderCubes(TreeBoneDefinition bone, VertexConsumer consumer, PoseStack.Pose pose,
                                       int lightmap, int overlay, float red, float green, float blue, float alpha) {
-        return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
+        return renderCubes(bone, consumer, pose, lightmap, overlay, red, green, blue, alpha, false);
+    }
+
+    public static boolean renderCubes(TreeBoneDefinition bone, VertexConsumer consumer, PoseStack.Pose pose,
+                                      int lightmap, int overlay, float red, float green, float blue, float alpha,
+                                      boolean skipNormalVisibilityCull) {
+        return !skipNormalVisibilityCull
+                && com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat.isLoaded()
                 && BackendHolder.RENDERER.renderCubes(bone, consumer, pose, lightmap, overlay, red, green, blue, alpha);
     }
 

@@ -29,9 +29,14 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
 
     public boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
                               Matrix4f finalPose, Matrix3f finalNormal) {
+        return writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, false);
+    }
+
+    public boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
+                              Matrix4f finalPose, Matrix3f finalNormal, boolean skipNormalVisibilityCull) {
         VertexBufferWriter writer = VertexConsumerUtils.convertOrLog(consumer);
         if (writer == null) return false;
-        return writeCubes(cubes, writer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        return writeCubes(cubes, writer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
     }
 
     public boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
@@ -42,9 +47,9 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
     }
 
     private synchronized boolean writeCubes(ICube[] cubes, VertexBufferWriter writer, int lightmap, int overlay, float red, float green, float blue, float alpha,
-                                            Matrix4f finalPose, Matrix3f finalNormal) {
+                                            Matrix4f finalPose, Matrix3f finalNormal, boolean skipNormalVisibilityCull) {
         int color = color(red, green, blue, alpha);
-        boolean cull = RenderSystem.getModelViewMatrix().m32() == 0;
+        boolean cull = !skipNormalVisibilityCull && RenderSystem.getModelViewMatrix().m32() == 0;
         int emitted = 0;
         long ptr = SCRATCH;
         for (ICube cube : cubes) {

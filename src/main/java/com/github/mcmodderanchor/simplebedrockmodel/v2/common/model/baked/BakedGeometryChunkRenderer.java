@@ -20,8 +20,13 @@ public class BakedGeometryChunkRenderer {
 
     public void render(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer,
                        int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        render(chunk, poseStack, quadConsumer, triangleConsumer, lightmap, overlay, red, green, blue, alpha, false);
+    }
+
+    public void render(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer quadConsumer, VertexConsumer triangleConsumer,
+                       int lightmap, int overlay, float red, float green, float blue, float alpha, boolean skipNormalVisibilityCull) {
         if (chunk.hasQuads()) {
-            renderQuadChunk(chunk, poseStack, quadConsumer, lightmap, overlay, red, green, blue, alpha);
+            renderQuadChunk(chunk, poseStack, quadConsumer, lightmap, overlay, red, green, blue, alpha, skipNormalVisibilityCull);
         }
         if (chunk.hasVertices()) {
             renderVertexChunk(chunk, poseStack, triangleConsumer, lightmap, overlay, red, green, blue, alpha);
@@ -30,20 +35,25 @@ public class BakedGeometryChunkRenderer {
 
     public void renderQuadChunk(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer consumer, int lightmap, int overlay,
                                 float red, float green, float blue, float alpha) {
+        renderQuadChunk(chunk, poseStack, consumer, lightmap, overlay, red, green, blue, alpha, false);
+    }
+
+    public void renderQuadChunk(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer consumer, int lightmap, int overlay,
+                                float red, float green, float blue, float alpha, boolean skipNormalVisibilityCull) {
         PoseStack.Pose pose = poseStack.last();
-        if (AcceleratedRenderingCompat.renderQuads(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha)) {
+        if (AcceleratedRenderingCompat.renderQuads(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha, skipNormalVisibilityCull)) {
             return;
         }
         Matrix4f poseMatrix = pose.pose();
         Matrix3f normalMatrix = pose.normal();
-        if (SodiumCompat.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, poseMatrix, normalMatrix)) {
+        if (SodiumCompat.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, poseMatrix, normalMatrix, skipNormalVisibilityCull)) {
             return;
         }
         BakedQuadData quads = chunk.quads();
         float[] positions = quads.positions();
         float[] normals = quads.normals();
         float[] uvs = quads.uvs();
-        boolean cull = RenderSystem.getModelViewMatrix().m32() == 0;
+        boolean cull = !skipNormalVisibilityCull && RenderSystem.getModelViewMatrix().m32() == 0;
         for (int i = 0; i < quads.quadCount(); i++) {
             int pb = i * BakedQuadData.POSITION_STRIDE;
             int nb = i * BakedQuadData.NORMAL_STRIDE;

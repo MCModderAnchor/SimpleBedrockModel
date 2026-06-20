@@ -13,8 +13,14 @@ public final class SodiumCompat {
 
     public static boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
                                      float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
+        return writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, false);
+    }
+
+    public static boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
+                                     float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal,
+                                     boolean skipNormalVisibilityCull) {
         return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()
-                && BackendHolder.WRITER.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+                && BackendHolder.WRITER.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
     }
 
     public static boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
@@ -25,8 +31,14 @@ public final class SodiumCompat {
 
     public static boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay,
                                      float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
+        return writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, false);
+    }
+
+    public static boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay,
+                                     float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal,
+                                     boolean skipNormalVisibilityCull) {
         return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()
-                && BackendHolder.TREE_WRITER.writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+                && BackendHolder.TREE_WRITER.writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
     }
 
     public static boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, int lightmap, int overlay,

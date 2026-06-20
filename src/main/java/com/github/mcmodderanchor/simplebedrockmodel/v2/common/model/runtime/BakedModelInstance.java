@@ -37,7 +37,13 @@ public class BakedModelInstance extends BoneTreeInstance {
     @OnlyIn(Dist.CLIENT)
     public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
                                float red, float green, float blue, float alpha) {
-        baseModel.renderToBuffer(this, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha);
+        renderToBuffer(poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
+                               float red, float green, float blue, float alpha, boolean skipNormalVisibilityCull) {
+        baseModel.renderToBuffer(this, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha, skipNormalVisibilityCull);
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -49,7 +55,14 @@ public class BakedModelInstance extends BoneTreeInstance {
     @OnlyIn(Dist.CLIENT)
     public void renderToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
                                RenderType triangleRenderType, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
-        baseModel.renderToBuffer(this, poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay, red, green, blue, alpha);
+        renderToBuffer(poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay, red, green, blue, alpha, false);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, RenderType quadRenderType,
+                               RenderType triangleRenderType, int packedLight, int packedOverlay, float red, float green, float blue, float alpha,
+                               boolean skipNormalVisibilityCull) {
+        baseModel.renderToBuffer(this, poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay, red, green, blue, alpha, skipNormalVisibilityCull);
     }
 
     @Override
