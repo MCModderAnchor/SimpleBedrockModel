@@ -41,7 +41,7 @@ public class BakedGeometryChunkRenderer {
     public void renderQuadChunk(BakedGeometryChunk chunk, PoseStack poseStack, VertexConsumer consumer, int lightmap, int overlay,
                                 float red, float green, float blue, float alpha, boolean skipNormalVisibilityCull) {
         PoseStack.Pose pose = poseStack.last();
-        if (AcceleratedRenderingCompat.renderQuads(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha, skipNormalVisibilityCull)) {
+        if (AcceleratedRenderingCompat.renderQuads(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha)) {
             return;
         }
         Matrix4f poseMatrix = pose.pose();

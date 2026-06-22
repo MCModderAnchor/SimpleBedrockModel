@@ -185,7 +185,7 @@ public class TreeBedrockModel implements BoneIndexProvider {
                                         boolean skipNormalVisibilityCull) {
         ICube[] cubes = def.cubes();
         if (cubes.length == 0) return;
-        if (AcceleratedRenderingCompat.renderCubes(def, consumer, pose, light, overlay, red, green, blue, alpha, skipNormalVisibilityCull)) {
+        if (AcceleratedRenderingCompat.renderCubes(def, consumer, pose, light, overlay, red, green, blue, alpha)) {
             return;
         }
         TreeGeometryWriter.writeCubes(cubes, consumer, pose.pose(), pose.normal(), light, overlay, red, green, blue, alpha, skipNormalVisibilityCull);
