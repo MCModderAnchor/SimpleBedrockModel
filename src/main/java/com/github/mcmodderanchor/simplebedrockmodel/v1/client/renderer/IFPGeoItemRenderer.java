@@ -29,6 +29,13 @@ public interface IFPGeoItemRenderer {
         return 0;
     }
 
+    /**
+     * 当该物品被持于主手时，是否禁止副手的第一人称渲染。
+     * 用于双手长枪等会霸占整个视野的物品：主手持有时副手不渲染。
+     * 注意这是主手视角的判定，与副手物品自身无关。
+     *
+     * @return 持于主手时是否禁止副手渲染
+     */
     default boolean blockOffhandRender() {
         return false;
     }

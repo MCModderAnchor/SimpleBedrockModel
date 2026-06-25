@@ -138,6 +138,11 @@ dependencies {
 //    runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
 //    runtimeOnly fg.deobf("curse.maven:accelerated-rendering-1314021:7342975")
 
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.3.6"))
+    implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.3.6")) {
+        jarJar.ranged(it, "[0.3.6,)")
+    }
+
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     // Test

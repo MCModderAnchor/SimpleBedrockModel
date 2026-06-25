@@ -33,23 +33,50 @@ public class FirstPersonRenderHandler {
     private static final FirstPersonParticleSystem PARTICLE_SYSTEM = new FirstPersonParticleSystem();
     private static long lastParticleTickNanos = 0L;
 
+    /**
+     * 单手第一人称渲染状态。主副手各持一份，互不干扰。
+     * 收枪过渡（put_away）是跨多帧的异步过程：旧 instance 保留为 {@link #previousInstance}
+     * 播放收枪动画，过渡结束后才切到新 instance。
+     */
+    private static final class HandRenderState {
+        /** 该手当前真实物品（切换检测基准）。 */
+        ItemStack realItem = ItemStack.EMPTY;
+        /** 当前活跃 instance。 */
+        IFPAnimationInstance activeInstance = null;
+        /** 收枪过渡中的旧 instance。 */
+        IFPAnimationInstance previousInstance = null;
+        /** 过渡完成后要切入的目标物品。 */
+        ItemStack pendingTarget = ItemStack.EMPTY;
+        /** 是否处于收枪过渡。 */
+        boolean transitioning = false;
+        /** 过渡目标是否为自定义物品（驱动 vanilla height 目标值）。 */
+        boolean nextIsCustom = false;
+        long switchStartTime = 0L;
+        long currentSheatheDuration = 0L;
+
+        void reset() {
+            realItem = ItemStack.EMPTY;
+            activeInstance = null;
+            previousInstance = null;
+            pendingTarget = ItemStack.EMPTY;
+            transitioning = false;
+            nextIsCustom = false;
+            switchStartTime = 0L;
+            currentSheatheDuration = 0L;
+        }
+    }
+
+    private static final HandRenderState MAIN_STATE = new HandRenderState();
+    private static final HandRenderState OFF_STATE = new HandRenderState();
+
+    /** 主手选中槽（仅主手有槽位概念）。 */
     private static int realSelectedSlot = -1;
-    private static ItemStack realMainHand = ItemStack.EMPTY;
-
-    private static boolean transitioning = false;
-
-    private static IFPAnimationInstance activeInstance = null;
-    private static IFPAnimationInstance previousInstance = null;
-
-    private static ItemStack pendingTarget = ItemStack.EMPTY;
-
-    private static long switchStartTime = 0L;
-    private static long currentSheatheDuration = 0L;
-
-    private static boolean lockVanilla = false;
-    private static boolean nextIsCustom = false;
 
     private static boolean forceHandSwapFlag = false;
+
+    private static HandRenderState stateFor(InteractionHand hand) {
+        return hand == InteractionHand.OFF_HAND ? OFF_STATE : MAIN_STATE;
+    }
 
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
@@ -58,16 +85,9 @@ public class FirstPersonRenderHandler {
 
     public static void reset() {
         realSelectedSlot = -1;
-        realMainHand = ItemStack.EMPTY;
-        transitioning = false;
-        activeInstance = null;
-        previousInstance = null;
-        pendingTarget = ItemStack.EMPTY;
-        lockVanilla = false;
-        nextIsCustom = false;
         forceHandSwapFlag = false;
-        switchStartTime = 0L;
-        currentSheatheDuration = 0L;
+        MAIN_STATE.reset();
+        OFF_STATE.reset();
         PARTICLE_SYSTEM.clear();
         lastParticleTickNanos = 0L;
     }
@@ -90,88 +110,93 @@ public class FirstPersonRenderHandler {
 
         int newSlot = player.getInventory().selected;
         ItemStack newMain = player.getMainHandItem();
+        ItemStack newOff = player.getOffhandItem();
 
-        boolean slotChanged = newSlot != realSelectedSlot || forceHandSwapFlag;
-        boolean itemChanged = !isSameItemStacks(realMainHand, newMain);
+        // 交换主副手（F 键）：两手物品已对调，强制两手都「先收枪再切枪」。
+        boolean swap = forceHandSwapFlag;
         forceHandSwapFlag = false;
 
+        // 主手：选中槽变化 + 物品变化双重检测（槽位是主手独有概念）。
+        boolean mainSlotChanged = newSlot != realSelectedSlot || swap;
+        boolean mainItemChanged = !isSameItemStacks(MAIN_STATE.realItem, newMain);
         realSelectedSlot = newSlot;
-        realMainHand = newMain;
-
-        if (slotChanged) {
-            onSlotChanged(newMain);
-        } else if (itemChanged) {
-            onItemChangedInSameSlot(newMain);
+        MAIN_STATE.realItem = newMain;
+        if (mainSlotChanged) {
+            onSlotChanged(MAIN_STATE, newMain, true);
+        } else if (mainItemChanged) {
+            onItemChanged(MAIN_STATE, newMain, true);
         }
 
-        if (activeInstance != null) {
-            activeInstance.updateItem(newMain);
+        // 副手：仅物品变化检测（无选中槽概念）。swap 时强制触发。
+        boolean offItemChanged = !isSameItemStacks(OFF_STATE.realItem, newOff) || swap;
+        OFF_STATE.realItem = newOff;
+        if (offItemChanged) {
+            onItemChanged(OFF_STATE, newOff, false);
         }
 
-        tickStates();
+        if (MAIN_STATE.activeInstance != null) {
+            MAIN_STATE.activeInstance.updateItem(newMain);
+        }
+        if (OFF_STATE.activeInstance != null) {
+            OFF_STATE.activeInstance.updateItem(newOff);
+        }
+
+        tickStates(MAIN_STATE);
+        tickStates(OFF_STATE);
     }
 
-    private static void onSlotChanged(ItemStack newStack) {
-        pendingTarget = newStack;
-        nextIsCustom = isCustomItem(newStack);
+    /**
+     * 主手选中槽变化处理。语义与物品变化基本一致，单独保留以便区分主手槽位路径
+     * （粒子发射器仅在主手切换时停止）。
+     */
+    private static void onSlotChanged(HandRenderState state, ItemStack newStack, boolean isMainHand) {
+        beginSwitch(state, newStack, isMainHand);
+    }
 
-        if (transitioning) {
+    /**
+     * 同槽位物品变化 / 副手物品变化处理。
+     */
+    private static void onItemChanged(HandRenderState state, ItemStack newStack, boolean isMainHand) {
+        beginSwitch(state, newStack, isMainHand);
+    }
+
+    /**
+     * 切换某只手的物品：旧 instance 若为自定义物品，进入收枪过渡；否则直接切到新 instance。
+     */
+    private static void beginSwitch(HandRenderState state, ItemStack newStack, boolean isMainHand) {
+        state.pendingTarget = newStack;
+        state.nextIsCustom = isCustomItem(newStack);
+
+        if (state.transitioning) {
             return;
         }
 
-        boolean oldIsCustom = activeInstance != null;
+        boolean oldIsCustom = state.activeInstance != null;
 
-        // 切换物品时停止旧发射器（不再产生新粒子，已有粒子继续存活至自然消亡）
-        stopOldEmitters();
+        // 切换物品时停止旧发射器（粒子全局，仅主手切换处理）。
+        if (isMainHand) {
+            stopOldEmitters();
+        }
 
-        previousInstance = activeInstance;
-        activeInstance = createInstance(newStack);
+        state.previousInstance = state.activeInstance;
+        state.activeInstance = createInstance(newStack);
 
         if (oldIsCustom) {
-            transitioning = true;
-            lockVanilla = true;
-            switchStartTime = CLOCK.nowMillis();
-            currentSheatheDuration = calculateSheatheDuration(previousInstance.currentItem());
-            previousInstance.triggerPutAway();
+            state.transitioning = true;
+            state.switchStartTime = CLOCK.nowMillis();
+            state.currentSheatheDuration = calculateSheatheDuration(state.previousInstance.currentItem());
+            state.previousInstance.triggerPutAway();
         } else {
-            transitioning = false;
-            lockVanilla = false;
+            state.transitioning = false;
         }
     }
 
-    private static void onItemChangedInSameSlot(ItemStack newStack) {
-        pendingTarget = newStack;
-        nextIsCustom = isCustomItem(newStack);
-
-        if (transitioning) {
-            return;
-        }
-
-        boolean oldIsCustom = activeInstance != null;
-
-        // 切换物品时停止旧发射器（不再产生新粒子，已有粒子继续存活至自然消亡）
-        stopOldEmitters();
-
-        previousInstance = activeInstance;
-        activeInstance = createInstance(newStack);
-
-        if (oldIsCustom) {
-            transitioning = true;
-            lockVanilla = true;
-            switchStartTime = CLOCK.nowMillis();
-            currentSheatheDuration = calculateSheatheDuration(previousInstance.currentItem());
-            previousInstance.triggerPutAway();
-        } else {
-            lockVanilla = false;
-        }
-    }
-
-    private static void tickStates() {
-        if (transitioning && getSheatheProgress() >= 1.0f) {
-            transitioning = false;
-            lockVanilla = false;
-            activeInstance = createInstance(pendingTarget);
-            previousInstance = null;
+    private static void tickStates(HandRenderState state) {
+        if (state.transitioning && getSheatheProgress(state) >= 1.0f) {
+            state.transitioning = false;
+            // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget）。
+            state.activeInstance = createInstance(state.realItem);
+            state.previousInstance = null;
         }
     }
 
@@ -188,10 +213,15 @@ public class FirstPersonRenderHandler {
         lastParticleTickNanos = now;
         PARTICLE_SYSTEM.tick(dt);
 
-        IFPAnimationInstance ani = getActiveAnimationInstance();
+        tickHandAnimation(MAIN_STATE, event.renderTickTime);
+        tickHandAnimation(OFF_STATE, event.renderTickTime);
+    }
+
+    private static void tickHandAnimation(HandRenderState state, float renderTickTime) {
+        IFPAnimationInstance ani = state.transitioning ? state.previousInstance : state.activeInstance;
         if (ani != null) {
             ani.triggerDraw();
-            ani.tick(event.renderTickTime);
+            ani.tick(renderTickTime);
         }
     }
 
@@ -202,7 +232,17 @@ public class FirstPersonRenderHandler {
             return;
         }
 
-        IFPAnimationInstance inst = getActiveAnimationInstance();
+        InteractionHand hand = event.getHand();
+
+        // 副手渲染前先看主手是否禁止副手渲染（如主手为双手长枪，会霸占副手）。
+        // 这是主手视角的判定，与副手物品自身无关。
+        if (hand == InteractionHand.OFF_HAND && mainHandBlocksOffhand()) {
+            renderParticlesIfAny(event);
+            event.setCanceled(true);
+            return;
+        }
+
+        IFPAnimationInstance inst = getActiveAnimationInstance(hand);
         if (inst == null) {
             renderParticlesIfAny(event);
             return;
@@ -221,16 +261,15 @@ public class FirstPersonRenderHandler {
         }
 
         IFPGeoItemRenderer renderer = optRenderer.get();
-        if (event.getHand() == InteractionHand.OFF_HAND && renderer.blockOffhandRender()) {
-            renderParticlesIfAny(event);
-            event.setCanceled(true);
-            return;
+
+        ItemDisplayContext transformType = hand == InteractionHand.OFF_HAND
+                ? ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+                : ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
+
+        // 粒子发射器变换仅在主手渲染时更新（粒子系统当前为主手专用）。
+        if (hand == InteractionHand.MAIN_HAND) {
+            renderer.updateParticleEmitterTransforms(PARTICLE_SYSTEM, event.getPoseStack());
         }
-
-        ItemDisplayContext transformType = ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
-
-        // 在渲染物品之前，让渲染器更新粒子发射器的变换矩阵
-        renderer.updateParticleEmitterTransforms(PARTICLE_SYSTEM, event.getPoseStack());
 
         renderer.renderFirstPerson(
                 player,
@@ -280,15 +319,38 @@ public class FirstPersonRenderHandler {
     }
 
     public static boolean shouldLockVanilla() {
-        return lockVanilla;
+        return shouldLockVanilla(InteractionHand.MAIN_HAND);
+    }
+
+    /**
+     * 该手是否处于收枪过渡（需要钉住 vanilla height、屏蔽原版升降动画）。
+     */
+    public static boolean shouldLockVanilla(InteractionHand hand) {
+        return stateFor(hand).transitioning;
     }
 
     public static float getTargetHeight() {
-        return nextIsCustom ? 1.0F : 0.0F;
+        return getTargetHeight(InteractionHand.MAIN_HAND);
     }
 
+    public static float getTargetHeight(InteractionHand hand) {
+        return stateFor(hand).nextIsCustom ? 1.0F : 0.0F;
+    }
+
+    /**
+     * 获取主手当前活跃动画 instance（过渡期返回正在收枪的旧 instance）。
+     * 无参版本保持主手语义，兼容现有调用方。
+     */
     public static IFPAnimationInstance getActiveAnimationInstance() {
-        return transitioning ? previousInstance : activeInstance;
+        return getActiveAnimationInstance(InteractionHand.MAIN_HAND);
+    }
+
+    /**
+     * 获取指定手的当前活跃动画 instance（过渡期返回正在收枪的旧 instance）。
+     */
+    public static IFPAnimationInstance getActiveAnimationInstance(InteractionHand hand) {
+        HandRenderState state = stateFor(hand);
+        return state.transitioning ? state.previousInstance : state.activeInstance;
     }
 
     /**
@@ -318,18 +380,48 @@ public class FirstPersonRenderHandler {
         return getRenderer(stack).isPresent();
     }
 
+    /**
+     * 该物品是否拥有自定义第一人称渲染器（即由本系统接管渲染的物品，如枪械）。
+     * 供 vanilla tick 接管逻辑判断是否套用「NBT 变化不算换物品」的语义。
+     */
+    public static boolean hasCustomRenderer(ItemStack stack) {
+        return getRenderer(stack).isPresent();
+    }
+
+    /**
+     * 按本系统语义判断两个物品堆是否为「同一持有物」。
+     * 对自定义物品（枪械）走渲染器的 {@code isSameItem}（NBT 变化不视为新物品），
+     * 否则回退到 vanilla 的 {@code ItemStack.isSameItem}。
+     */
+    public static boolean isSameHeldItem(ItemStack a, ItemStack b) {
+        return isSameItemStacks(a, b);
+    }
+
     private static long calculateSheatheDuration(ItemStack stack) {
         return getRenderer(stack)
                 .map(r -> r.getPutAwayDuration(stack))
                 .orElse(0L);
     }
 
-    private static float getSheatheProgress() {
-        if (currentSheatheDuration <= 0) {
+    private static float getSheatheProgress(HandRenderState state) {
+        if (state.currentSheatheDuration <= 0) {
             return 1.0f;
         }
-        long elapsed = CLOCK.nowMillis() - switchStartTime;
-        return Math.min(1.0f, (float) elapsed / currentSheatheDuration);
+        long elapsed = CLOCK.nowMillis() - state.switchStartTime;
+        return Math.min(1.0f, (float) elapsed / state.currentSheatheDuration);
+    }
+
+    /**
+     * 主手当前持有物是否禁止副手第一人称渲染（如主手为双手长枪，霸占整个视野）。
+     * 取主手当前活跃 instance（过渡期为正在收枪的旧 instance）对应的渲染器判定。
+     */
+    private static boolean mainHandBlocksOffhand() {
+        IFPAnimationInstance mainInst = getActiveAnimationInstance(InteractionHand.MAIN_HAND);
+        if (mainInst == null) {
+            return false;
+        }
+        ItemStack mainStack = mainInst.currentItem();
+        return getRenderer(mainStack).map(IFPGeoItemRenderer::blockOffhandRender).orElse(false);
     }
 
     private static Optional<IFPGeoItemRenderer> getRenderer(ItemStack stack) {
