@@ -78,6 +78,10 @@ public class FirstPersonRenderHandler {
         return hand == InteractionHand.OFF_HAND ? OFF_STATE : MAIN_STATE;
     }
 
+    private static InteractionHand handForState(HandRenderState state) {
+        return state == OFF_STATE ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
+    }
+
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
         reset();
@@ -141,8 +145,8 @@ public class FirstPersonRenderHandler {
             OFF_STATE.activeInstance.updateItem(newOff);
         }
 
-        tickStates(MAIN_STATE);
-        tickStates(OFF_STATE);
+        tickStates(MAIN_STATE, InteractionHand.MAIN_HAND);
+        tickStates(OFF_STATE, InteractionHand.OFF_HAND);
     }
 
     /**
@@ -179,7 +183,7 @@ public class FirstPersonRenderHandler {
         }
 
         state.previousInstance = state.activeInstance;
-        state.activeInstance = createInstance(newStack);
+        state.activeInstance = createInstance(newStack, handForState(state));
 
         if (oldIsCustom) {
             state.transitioning = true;
@@ -191,11 +195,11 @@ public class FirstPersonRenderHandler {
         }
     }
 
-    private static void tickStates(HandRenderState state) {
+    private static void tickStates(HandRenderState state, InteractionHand hand) {
         if (state.transitioning && getSheatheProgress(state) >= 1.0f) {
             state.transitioning = false;
             // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget）。
-            state.activeInstance = createInstance(state.realItem);
+            state.activeInstance = createInstance(state.realItem,  hand);
             state.previousInstance = null;
         }
     }
@@ -354,6 +358,14 @@ public class FirstPersonRenderHandler {
     }
 
     /**
+     * 摄像机使用的当前活跃动画 instance：主手优先，主手不存在时回退副手。
+     */
+    public static IFPAnimationInstance getActiveAnimationInstanceForCamera() {
+        IFPAnimationInstance main = getActiveAnimationInstance(InteractionHand.MAIN_HAND);
+        return main != null ? main : getActiveAnimationInstance(InteractionHand.OFF_HAND);
+    }
+
+    /**
      * 获取全局第一人称粒子系统。所有自定义物品渲染器通过此方法添加发射器。
      */
     public static FirstPersonParticleSystem getParticleSystem() {
@@ -370,9 +382,9 @@ public class FirstPersonRenderHandler {
         }
     }
 
-    private static IFPAnimationInstance createInstance(ItemStack stack) {
+    private static IFPAnimationInstance createInstance(ItemStack stack, InteractionHand hand) {
         return getRenderer(stack)
-                .map(r -> r.createAnimationInstance(stack, Minecraft.getInstance().getCameraEntity()))
+                .map(r -> r.createAnimationInstance(stack, Minecraft.getInstance().getCameraEntity(), hand))
                 .orElse(null);
     }
 
@@ -421,7 +433,7 @@ public class FirstPersonRenderHandler {
             return false;
         }
         ItemStack mainStack = mainInst.currentItem();
-        return getRenderer(mainStack).map(IFPGeoItemRenderer::blockOffhandRender).orElse(false);
+        return getRenderer(mainStack).map(r -> r.blockOffhandRender(mainStack)).orElse(false);
     }
 
     private static Optional<IFPGeoItemRenderer> getRenderer(ItemStack stack) {

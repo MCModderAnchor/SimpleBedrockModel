@@ -52,7 +52,11 @@ public class ItemInHandRendererMixin {
      */
     @WrapOperation(
             method = "tick",
-            at = @At(value = "INVOKE", target = "Lnet/minecraftforge/client/ForgeHooksClient;shouldCauseReequipAnimation(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;I)Z")
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraftforge/client/ForgeHooksClient;shouldCauseReequipAnimation(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;I)Z",
+                    remap = false
+            )
     )
     private boolean sbm$shouldReequip(ItemStack cached, ItemStack current, int slot, Operation<Boolean> original) {
         if (FirstPersonRenderHandler.hasCustomRenderer(cached) || FirstPersonRenderHandler.hasCustomRenderer(current)) {

@@ -6,6 +6,7 @@ import com.maydaymemory.mae.basic.YXZRotationView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -25,6 +26,11 @@ public interface IFPGeoItemRenderer {
         return null;
     }
 
+    @Nullable
+    default IFPAnimationInstance createAnimationInstance(ItemStack stack, Entity entity, InteractionHand hand) {
+        return createAnimationInstance(stack, entity);
+    }
+
     default long getPutAwayDuration(ItemStack stack) {
         return 0;
     }
@@ -38,6 +44,10 @@ public interface IFPGeoItemRenderer {
      */
     default boolean blockOffhandRender() {
         return false;
+    }
+
+    default boolean blockOffhandRender(ItemStack stack) {
+        return blockOffhandRender();
     }
 
     /**
