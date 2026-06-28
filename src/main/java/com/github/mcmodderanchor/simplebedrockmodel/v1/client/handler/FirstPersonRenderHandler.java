@@ -51,6 +51,8 @@ public class FirstPersonRenderHandler {
         boolean transitioning = false;
         /** 过渡目标是否为自定义物品（驱动 vanilla height 目标值）。 */
         boolean nextIsCustom = false;
+        /** 当前活跃 instance 的渲染变体键（{@link IFPGeoItemRenderer#getRenderVariantKey}）。 */
+        Object variantKey = null;
         long switchStartTime = 0L;
         long currentSheatheDuration = 0L;
 
@@ -61,6 +63,7 @@ public class FirstPersonRenderHandler {
             pendingTarget = ItemStack.EMPTY;
             transitioning = false;
             nextIsCustom = false;
+            variantKey = null;
             switchStartTime = 0L;
             currentSheatheDuration = 0L;
         }
@@ -71,6 +74,10 @@ public class FirstPersonRenderHandler {
 
     /** 主手选中槽（仅主手有槽位概念）。 */
     private static int realSelectedSlot = -1;
+
+    // 上一刻「主手是否霸占副手视野」的镜像。由 false→true 时丢弃副手实例（被遮挡，收枪不可见），
+    // true→false 时副手按当前物品重新掏枪，避免遮挡解除后副手旧实例原样「秒出」。
+    private static boolean mainOccupiedOffhand = false;
 
     private static boolean forceHandSwapFlag = false;
 
@@ -90,6 +97,7 @@ public class FirstPersonRenderHandler {
     public static void reset() {
         realSelectedSlot = -1;
         forceHandSwapFlag = false;
+        mainOccupiedOffhand = false;
         MAIN_STATE.reset();
         OFF_STATE.reset();
         PARTICLE_SYSTEM.clear();
@@ -120,22 +128,36 @@ public class FirstPersonRenderHandler {
         boolean swap = forceHandSwapFlag;
         forceHandSwapFlag = false;
 
-        // 主手：选中槽变化 + 物品变化双重检测（槽位是主手独有概念）。
+        // 主手：选中槽变化 + 物品变化 + 渲染变体键变化检测（槽位是主手独有概念）。
         boolean mainSlotChanged = newSlot != realSelectedSlot || swap;
         boolean mainItemChanged = !isSameItemStacks(MAIN_STATE.realItem, newMain);
+        boolean mainVariantChanged = variantKeyChanged(MAIN_STATE, newMain, InteractionHand.MAIN_HAND);
         realSelectedSlot = newSlot;
         MAIN_STATE.realItem = newMain;
-        if (mainSlotChanged) {
-            onSlotChanged(MAIN_STATE, newMain, true);
-        } else if (mainItemChanged) {
-            onItemChanged(MAIN_STATE, newMain, true);
+        if (mainSlotChanged || mainItemChanged || mainVariantChanged) {
+            beginSwitch(MAIN_STATE, newMain, true);
         }
 
-        // 副手：仅物品变化检测（无选中槽概念）。swap 时强制触发。
+        // 副手：物品变化 + 渲染变体键变化检测（无选中槽概念）。swap 时强制触发。
         boolean offItemChanged = !isSameItemStacks(OFF_STATE.realItem, newOff) || swap;
+        boolean offVariantChanged = variantKeyChanged(OFF_STATE, newOff, InteractionHand.OFF_HAND);
         OFF_STATE.realItem = newOff;
-        if (offItemChanged) {
-            onItemChanged(OFF_STATE, newOff, false);
+        if (offItemChanged || offVariantChanged) {
+            beginSwitch(OFF_STATE, newOff, false);
+        }
+
+        // 主手霸占副手视野的状态翻转（如主手换上双手长枪 / 又切走）。副手物品本身可能未变，
+        // 故物品变化检测无法覆盖；这里独立检测：
+        // - false→true：主手开始霸占，副手被遮挡（收枪动画不可见），直接丢弃副手实例。
+        // - true→false：主手释放视野，副手按当前物品重新掏枪，避免旧实例原样「秒出」。
+        boolean occupiedNow = mainHandBlocksOffhand();
+        if (occupiedNow != mainOccupiedOffhand) {
+            mainOccupiedOffhand = occupiedNow;
+            if (occupiedNow) {
+                discardOffhandInstance();
+            } else if (!newOff.isEmpty()) {
+                beginSwitch(OFF_STATE, newOff, false);
+            }
         }
 
         if (MAIN_STATE.activeInstance != null) {
@@ -150,28 +172,43 @@ public class FirstPersonRenderHandler {
     }
 
     /**
-     * 主手选中槽变化处理。语义与物品变化基本一致，单独保留以便区分主手槽位路径
-     * （粒子发射器仅在主手切换时停止）。
+     * 检测某手「渲染变体键」是否相对当前活跃 instance 发生变化（物品同一但呈现形态需切换）。
+     * 无活跃 instance 时不算变化（由物品变化路径负责建立）。
      */
-    private static void onSlotChanged(HandRenderState state, ItemStack newStack, boolean isMainHand) {
-        beginSwitch(state, newStack, isMainHand);
+    private static boolean variantKeyChanged(HandRenderState state, ItemStack heldItem, InteractionHand hand) {
+        if (state.activeInstance == null || heldItem.isEmpty()) {
+            return false;
+        }
+        Object newKey = getRenderVariantKey(heldItem, hand);
+        return !java.util.Objects.equals(newKey, state.variantKey);
+    }
+
+    private static Object getRenderVariantKey(ItemStack stack, InteractionHand hand) {
+        return getRenderer(stack)
+                .map(r -> r.getRenderVariantKey(stack, hand))
+                .orElse(null);
     }
 
     /**
-     * 同槽位物品变化 / 副手物品变化处理。
-     */
-    private static void onItemChanged(HandRenderState state, ItemStack newStack, boolean isMainHand) {
-        beginSwitch(state, newStack, isMainHand);
-    }
-
-    /**
-     * 切换某只手的物品：旧 instance 若为自定义物品，进入收枪过渡；否则直接切到新 instance。
+     * 切换某只手的物品 / 渲染变体：旧 instance 若为自定义物品，进入收枪过渡；否则直接切到新 instance。
+     * <p>
+     * 「物品变化」与「渲染变体键变化」共用此通路，统一走 put_away → draw，由本类单一管理实例生命周期。
      */
     private static void beginSwitch(HandRenderState state, ItemStack newStack, boolean isMainHand) {
+        InteractionHand hand = handForState(state);
+        Object newVariantKey = getRenderVariantKey(newStack, hand);
         state.pendingTarget = newStack;
         state.nextIsCustom = isCustomItem(newStack);
 
         if (state.transitioning) {
+            return;
+        }
+
+        // 幂等保护：当前活跃 instance 已代表「同一持有物 + 同一渲染变体」时不重复切换，
+        // 避免「物品变化」与「swap 强制」在不同 tick 对同一目标各触发一次，导致连续掏两次。
+        if (state.activeInstance != null
+                && isSameItemStacks(state.activeInstance.currentItem(), newStack)
+                && java.util.Objects.equals(state.variantKey, newVariantKey)) {
             return;
         }
 
@@ -183,7 +220,8 @@ public class FirstPersonRenderHandler {
         }
 
         state.previousInstance = state.activeInstance;
-        state.activeInstance = createInstance(newStack, handForState(state));
+        state.activeInstance = createInstance(newStack, hand);
+        state.variantKey = newVariantKey;
 
         if (oldIsCustom) {
             state.transitioning = true;
@@ -198,10 +236,24 @@ public class FirstPersonRenderHandler {
     private static void tickStates(HandRenderState state, InteractionHand hand) {
         if (state.transitioning && getSheatheProgress(state) >= 1.0f) {
             state.transitioning = false;
-            // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget）。
-            state.activeInstance = createInstance(state.realItem,  hand);
+            // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget），
+            // 并按当前形态记录变体键。
+            state.activeInstance = createInstance(state.realItem, hand);
+            state.variantKey = getRenderVariantKey(state.realItem, hand);
             state.previousInstance = null;
         }
+    }
+
+    /**
+     * 直接丢弃副手渲染实例（不播收枪过渡）。用于主手霸占副手视野时——副手被遮挡，
+     * 收枪动画不可见，无需过渡；遮挡解除时再按当前物品重新掏枪。
+     */
+    private static void discardOffhandInstance() {
+        OFF_STATE.activeInstance = null;
+        OFF_STATE.previousInstance = null;
+        OFF_STATE.pendingTarget = ItemStack.EMPTY;
+        OFF_STATE.transitioning = false;
+        OFF_STATE.variantKey = null;
     }
 
     @SubscribeEvent
@@ -265,6 +317,13 @@ public class FirstPersonRenderHandler {
         }
 
         IFPGeoItemRenderer renderer = optRenderer.get();
+
+        // 物品自身判定能否在该手渲染（如双手长枪放副手时不在副手渲染）。
+        if (!renderer.canRenderInHand(stack, hand)) {
+            renderParticlesIfAny(event);
+            event.setCanceled(true);
+            return;
+        }
 
         ItemDisplayContext transformType = hand == InteractionHand.OFF_HAND
                 ? ItemDisplayContext.FIRST_PERSON_LEFT_HAND

@@ -51,6 +51,41 @@ public interface IFPGeoItemRenderer {
     }
 
     /**
+     * 该物品当前是否允许在指定手进行第一人称渲染。
+     * <p>
+     * 用于「物品本身决定能否在某只手呈现」的场景：例如双手长枪放入副手时不应在副手渲染。
+     * 与 {@link #blockOffhandRender(ItemStack)} 区分——后者是「主手物品霸占视野从而禁止副手」的
+     * 主手视角判定；本方法是被渲染物品对自身所在手的判定。
+     *
+     * @param stack 待渲染物品
+     * @param hand  渲染所在手
+     * @return 允许渲染返回 {@code true}（默认），否则 {@code false}
+     */
+    default boolean canRenderInHand(ItemStack stack, InteractionHand hand) {
+        return true;
+    }
+
+    /**
+     * 渲染变体键：标识「同一物品」当前应使用哪一套渲染变体（模型骨架 / 动画 / 控制器）。
+     * <p>
+     * 适用于物品未变、但呈现形态需要切换的场景（例如同一把枪因双持 / 单持切换需在双手骨架与
+     * 单手骨架变体之间切换）。SBM 每 tick 轮询此键，键变化时与「物品变化」走同一条
+     * put_away → draw 通路重建渲染实例，由 SBM 统一管理生命周期；实现方<b>不应</b>自行在
+     * 动画实例内部重建运行时，以免与 SBM 的实例切换时序冲突。
+     * <p>
+     * 默认返回 {@code null}（无变体，仅靠物品变化驱动切换）。返回值需可用 {@code equals} 比较，
+     * 且对同一形态稳定。
+     *
+     * @param stack 当前物品
+     * @param hand  所在手
+     * @return 当前变体键；{@code null} 表示无变体
+     */
+    @Nullable
+    default Object getRenderVariantKey(ItemStack stack, InteractionHand hand) {
+        return null;
+    }
+
+    /**
      * 使用该渲染器的物品会阻止原版的 viewBobbing，以便应用自定义的跑步/走路动画。
      *
      * @return 是否阻止原版 viewBobbing
