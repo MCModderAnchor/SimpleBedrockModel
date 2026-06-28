@@ -129,21 +129,24 @@ public class FirstPersonRenderHandler {
         forceHandSwapFlag = false;
 
         // 主手：选中槽变化 + 物品变化 + 渲染变体键变化检测（槽位是主手独有概念）。
-        boolean mainSlotChanged = newSlot != realSelectedSlot || swap;
+        boolean mainSlotChanged = newSlot != realSelectedSlot;
         boolean mainItemChanged = !isSameItemStacks(MAIN_STATE.realItem, newMain);
         boolean mainVariantChanged = variantKeyChanged(MAIN_STATE, newMain, InteractionHand.MAIN_HAND);
         realSelectedSlot = newSlot;
         MAIN_STATE.realItem = newMain;
-        if (mainSlotChanged || mainItemChanged || mainVariantChanged) {
-            beginSwitch(MAIN_STATE, newMain, true);
+        // swap（两手对调）与切格子都是「明确的外部切换事件」：即便新旧物品同 id 同变体（值层面无差异），
+        // 也确需重建，故强制穿透幂等短路。
+        boolean mainForce = swap || mainSlotChanged;
+        if (mainForce || mainItemChanged || mainVariantChanged) {
+            beginSwitch(MAIN_STATE, newMain, true, mainForce);
         }
 
         // 副手：物品变化 + 渲染变体键变化检测（无选中槽概念）。swap 时强制触发。
-        boolean offItemChanged = !isSameItemStacks(OFF_STATE.realItem, newOff) || swap;
+        boolean offItemChanged = !isSameItemStacks(OFF_STATE.realItem, newOff);
         boolean offVariantChanged = variantKeyChanged(OFF_STATE, newOff, InteractionHand.OFF_HAND);
         OFF_STATE.realItem = newOff;
-        if (offItemChanged || offVariantChanged) {
-            beginSwitch(OFF_STATE, newOff, false);
+        if (swap || offItemChanged || offVariantChanged) {
+            beginSwitch(OFF_STATE, newOff, false, swap);
         }
 
         // 主手霸占副手视野的状态翻转（如主手换上双手长枪 / 又切走）。副手物品本身可能未变，
@@ -156,7 +159,7 @@ public class FirstPersonRenderHandler {
             if (occupiedNow) {
                 discardOffhandInstance();
             } else if (!newOff.isEmpty()) {
-                beginSwitch(OFF_STATE, newOff, false);
+                beginSwitch(OFF_STATE, newOff, false, false);
             }
         }
 
@@ -193,8 +196,10 @@ public class FirstPersonRenderHandler {
      * 切换某只手的物品 / 渲染变体：旧 instance 若为自定义物品，进入收枪过渡；否则直接切到新 instance。
      * <p>
      * 「物品变化」与「渲染变体键变化」共用此通路，统一走 put_away → draw，由本类单一管理实例生命周期。
+     *
+     * @param force 是否穿透幂等短路（用于 swap 等「值层面无差异但确需重建」的明确外部事件）
      */
-    private static void beginSwitch(HandRenderState state, ItemStack newStack, boolean isMainHand) {
+    private static void beginSwitch(HandRenderState state, ItemStack newStack, boolean isMainHand, boolean force) {
         InteractionHand hand = handForState(state);
         Object newVariantKey = getRenderVariantKey(newStack, hand);
         state.pendingTarget = newStack;
@@ -205,8 +210,10 @@ public class FirstPersonRenderHandler {
         }
 
         // 幂等保护：当前活跃 instance 已代表「同一持有物 + 同一渲染变体」时不重复切换，
-        // 避免「物品变化」与「swap 强制」在不同 tick 对同一目标各触发一次，导致连续掏两次。
-        if (state.activeInstance != null
+        // 避免「物品变化」与「变体变化」在同一目标上重复触发，导致连续掏两次。
+        // force=true（如 swap 对调两把同 id 枪）时穿透此短路，强制重建。
+        if (!force
+                && state.activeInstance != null
                 && isSameItemStacks(state.activeInstance.currentItem(), newStack)
                 && java.util.Objects.equals(state.variantKey, newVariantKey)) {
             return;
