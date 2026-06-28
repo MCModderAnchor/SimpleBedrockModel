@@ -141,25 +141,32 @@ public class FirstPersonRenderHandler {
             beginSwitch(MAIN_STATE, newMain, true, mainForce);
         }
 
-        // 副手：物品变化 + 渲染变体键变化检测（无选中槽概念）。swap 时强制触发。
-        boolean offItemChanged = !isSameItemStacks(OFF_STATE.realItem, newOff);
-        boolean offVariantChanged = variantKeyChanged(OFF_STATE, newOff, InteractionHand.OFF_HAND);
+        ItemStack prevOff = OFF_STATE.realItem;
         OFF_STATE.realItem = newOff;
-        if (swap || offItemChanged || offVariantChanged) {
-            beginSwitch(OFF_STATE, newOff, false, swap);
-        }
 
-        // 主手霸占副手视野的状态翻转（如主手换上双手长枪 / 又切走）。副手物品本身可能未变，
-        // 故物品变化检测无法覆盖；这里独立检测：
-        // - false→true：主手开始霸占，副手被遮挡（收枪动画不可见），直接丢弃副手实例。
-        // - true→false：主手释放视野，副手按当前物品重新掏枪，避免旧实例原样「秒出」。
+        // 主手是否霸占副手视野（主手活跃 instance 判定，过渡期为正在收枪的旧 instance）。
+        // 必须在副手切换处理之前计算：霸占期间副手不可见，应完全抑制副手掏枪，
+        // 否则副手会在被遮挡时静默掏枪，待霸占解除后凭空「弹出」。
         boolean occupiedNow = mainHandBlocksOffhand();
-        if (occupiedNow != mainOccupiedOffhand) {
-            mainOccupiedOffhand = occupiedNow;
-            if (occupiedNow) {
+        boolean occupyFlip = occupiedNow != mainOccupiedOffhand;
+        mainOccupiedOffhand = occupiedNow;
+
+        if (occupiedNow) {
+            // 主手霸占副手视野：丢弃副手实例（不可见，收枪动画无意义），且不掏新枪。
+            if (occupyFlip) {
                 discardOffhandInstance();
-            } else if (!newOff.isEmpty()) {
-                beginSwitch(OFF_STATE, newOff, false, false);
+            }
+        } else if (occupyFlip) {
+            // 霸占刚解除：副手按当前物品全新掏枪（可见的掏枪动画）。
+            if (!newOff.isEmpty()) {
+                beginSwitch(OFF_STATE, newOff, false, true);
+            }
+        } else {
+            // 未被霸占的常规路径：副手物品变化 / 渲染变体键变化 / swap 时切换。
+            boolean offItemChanged = !isSameItemStacks(prevOff, newOff);
+            boolean offVariantChanged = variantKeyChanged(OFF_STATE, newOff, InteractionHand.OFF_HAND);
+            if (swap || offItemChanged || offVariantChanged) {
+                beginSwitch(OFF_STATE, newOff, false, swap);
             }
         }
 
@@ -490,16 +497,14 @@ public class FirstPersonRenderHandler {
     }
 
     /**
-     * 主手当前持有物是否禁止副手第一人称渲染（如主手为双手长枪，霸占整个视野）。
-     * 取主手当前活跃 instance（过渡期为正在收枪的旧 instance）对应的渲染器判定。
+     * 主手当前活跃 instance 是否霸占副手第一人称视野（如主手为双手长枪 / 单手枪双手持握）。
+     * <p>
+     * 取主手当前活跃 instance（过渡期为正在收枪的旧 instance）的 {@link IFPAnimationInstance#occupiesView()}：
+     * 该判定绑定实例固定的渲染形态，过渡期间稳定，避免因实时手持物已变导致霸占状态抖动。
      */
     private static boolean mainHandBlocksOffhand() {
         IFPAnimationInstance mainInst = getActiveAnimationInstance(InteractionHand.MAIN_HAND);
-        if (mainInst == null) {
-            return false;
-        }
-        ItemStack mainStack = mainInst.currentItem();
-        return getRenderer(mainStack).map(r -> r.blockOffhandRender(mainStack)).orElse(false);
+        return mainInst != null && mainInst.occupiesView();
     }
 
     private static Optional<IFPGeoItemRenderer> getRenderer(ItemStack stack) {

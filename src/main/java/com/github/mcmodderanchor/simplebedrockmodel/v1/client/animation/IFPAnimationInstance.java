@@ -51,6 +51,19 @@ public interface IFPAnimationInstance {
 
     void triggerPutAway();
 
+    /**
+     * 本实例（当前固定的渲染形态）是否霸占整个第一人称视野，从而禁止副手渲染。
+     * <p>
+     * 与 {@code IFPGeoItemRenderer.blockOffhandRender(ItemStack)} 的区别：此判定绑定到<b>具体实例</b>，
+     * 其渲染形态在创建时即固定（如双手 / 单手变体），过渡期间稳定不变，故 SBM 用它判断主手是否霸占
+     * 副手时，在掏枪 / 收枪过渡中不会因「实时手持物已变」而抖动。默认 {@code false}。
+     *
+     * @return 是否霸占视野禁止副手渲染
+     */
+    default boolean occupiesView() {
+        return false;
+    }
+
     default boolean shouldRenderHand() {
         return false;
     }
