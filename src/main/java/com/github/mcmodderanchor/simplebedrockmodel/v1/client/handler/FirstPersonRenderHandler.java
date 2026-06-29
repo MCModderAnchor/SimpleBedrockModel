@@ -7,7 +7,6 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.event.SwapItemWith
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.IFPGeoItemRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.firstperson.FirstPersonParticleSystem;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.render.CameraStateCache;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -145,7 +144,7 @@ public class FirstPersonRenderHandler {
         // 也确需重建，故强制穿透幂等短路。
         boolean mainForce = swap || mainSlotChanged;
         if (mainForce || mainItemChanged || mainVariantChanged) {
-            beginSwitch(MAIN_STATE, newMain, true, mainForce);
+            beginSwitch(MAIN_STATE, newMain, mainForce);
         }
 
         // 仅在检测到物品变化时刷新副手拷贝（同主手，避免取走物品时引用同变漏判）。
@@ -165,17 +164,19 @@ public class FirstPersonRenderHandler {
             // 主手霸占副手视野：丢弃副手实例（不可见，收枪动画无意义），且不掏新枪。
             if (occupyFlip) {
                 discardOffhandInstance();
+                // 副手被遮挡：停止副手发射器，不再产出新粒子（已生成粒子继续消亡）。
+                PARTICLE_SYSTEM.stopEmitters(InteractionHand.OFF_HAND);
             }
         } else if (occupyFlip) {
             // 霸占刚解除：副手按当前物品全新掏枪（可见的掏枪动画）。
             if (!newOff.isEmpty()) {
-                beginSwitch(OFF_STATE, newOff, false, true);
+                beginSwitch(OFF_STATE, newOff, true);
             }
         } else {
             // 未被霸占的常规路径：副手物品变化 / 渲染变体键变化 / swap 时切换。
             boolean offVariantChanged = variantKeyChanged(OFF_STATE, newOff, InteractionHand.OFF_HAND);
             if (swap || offRealChanged || offVariantChanged) {
-                beginSwitch(OFF_STATE, newOff, false, swap);
+                beginSwitch(OFF_STATE, newOff, swap);
             }
         }
 
@@ -215,7 +216,7 @@ public class FirstPersonRenderHandler {
      *
      * @param force 是否穿透幂等短路（用于 swap 等「值层面无差异但确需重建」的明确外部事件）
      */
-    private static void beginSwitch(HandRenderState state, ItemStack newStack, boolean isMainHand, boolean force) {
+    private static void beginSwitch(HandRenderState state, ItemStack newStack, boolean force) {
         InteractionHand hand = handForState(state);
         Object newVariantKey = getRenderVariantKey(newStack, hand);
         state.pendingTarget = newStack;
@@ -237,10 +238,8 @@ public class FirstPersonRenderHandler {
 
         boolean oldIsCustom = state.activeInstance != null;
 
-        // 切换物品时停止旧发射器（粒子全局，仅主手切换处理）。
-        if (isMainHand) {
-            stopOldEmitters();
-        }
+        // 切换物品时停止该手旧发射器（已生成粒子继续按生命周期消亡）。
+        PARTICLE_SYSTEM.stopEmitters(hand);
 
         state.previousInstance = state.activeInstance;
         state.activeInstance = createInstance(newStack, hand);
@@ -352,10 +351,8 @@ public class FirstPersonRenderHandler {
                 ? ItemDisplayContext.FIRST_PERSON_LEFT_HAND
                 : ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
 
-        // 粒子发射器变换仅在主手渲染时更新（粒子系统当前为主手专用）。
-        if (hand == InteractionHand.MAIN_HAND) {
-            renderer.updateParticleEmitterTransforms(PARTICLE_SYSTEM, event.getPoseStack());
-        }
+        // 更新该手粒子发射器变换（主副手各自在自己的 pass 内捕获基准、绑定枪口）。
+        renderer.updateParticleEmitterTransforms(PARTICLE_SYSTEM, event.getPoseStack(), hand);
 
         renderer.renderFirstPerson(
                 player,
@@ -372,10 +369,13 @@ public class FirstPersonRenderHandler {
     }
 
     /**
-     * 如果有活跃粒子，在 PoseStack 上下文中渲染它们。
+     * 渲染当前 pass 这只手的活跃粒子。
+     * <p>
+     * 主副手各在自己的 {@code RenderHandEvent} pass 内渲染自己那组发射器——两手 pass 的
+     * poseStack 基准不同，必须按手渲染，不可跨手共用基准。
      */
     private static void renderParticlesIfAny(RenderHandEvent event) {
-        if (event.getHand() == InteractionHand.OFF_HAND || PARTICLE_SYSTEM.getParticleCount() == 0) {
+        if (PARTICLE_SYSTEM.getParticleCount() == 0) {
             return;
         }
 
@@ -385,6 +385,7 @@ public class FirstPersonRenderHandler {
         Matrix4f cameraRotation = buildCameraRotation(camera, cameraRollRad);
 
         PARTICLE_SYSTEM.render(
+                event.getHand(),
                 event.getPoseStack(),
                 event.getMultiBufferSource(),
                 event.getPackedLight(),
@@ -452,16 +453,6 @@ public class FirstPersonRenderHandler {
      */
     public static FirstPersonParticleSystem getParticleSystem() {
         return PARTICLE_SYSTEM;
-    }
-
-    /**
-     * 停止所有旧发射器（设置 removed 状态），使它们不再生成新粒子。
-     * 已有粒子继续按其生命周期 tick，直到自然消亡。
-     */
-    private static void stopOldEmitters() {
-        for (ParticleEmitterInstance emitter : PARTICLE_SYSTEM.getEmitters()) {
-            emitter.setRemoved(true);
-        }
     }
 
     private static IFPAnimationInstance createInstance(ItemStack stack, InteractionHand hand) {

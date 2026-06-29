@@ -121,8 +121,9 @@ public interface IFPGeoItemRenderer {
      *
      * @param system    全局粒子系统实例
      * @param poseStack 当前渲染使用的 PoseStack
+     * @param hand      当前渲染的手（主手 / 副手），用于按手隔离发射器绑定状态
      */
-    default void updateParticleEmitterTransforms(FirstPersonParticleSystem system, PoseStack poseStack) {
+    default void updateParticleEmitterTransforms(FirstPersonParticleSystem system, PoseStack poseStack, InteractionHand hand) {
         // 默认空实现，由有粒子效果的渲染器覆写
     }
 
