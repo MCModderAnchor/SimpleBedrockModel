@@ -132,8 +132,15 @@ public class FirstPersonRenderHandler {
         boolean mainSlotChanged = newSlot != realSelectedSlot;
         boolean mainItemChanged = !isSameItemStacks(MAIN_STATE.realItem, newMain);
         boolean mainVariantChanged = variantKeyChanged(MAIN_STATE, newMain, InteractionHand.MAIN_HAND);
+
         realSelectedSlot = newSlot;
-        MAIN_STATE.realItem = newMain;
+        // 仅在检测到物品变化时刷新拷贝。存拷贝而非引用：物品被取走时 Minecraft 会原地把槽位
+        // ItemStack 的 count 改为 0（isEmpty 变 true），若存引用则 realItem 随之变 0，下一 tick
+        // isSameItemStacks 因「同一对象」短路为 true 而漏判「持有物消失」。无变化时旧拷贝仍是有效
+        // 冻结快照，无需每 tick 重拷。
+        if (mainItemChanged) {
+            MAIN_STATE.realItem = newMain.copy();
+        }
         // swap（两手对调）与切格子都是「明确的外部切换事件」：即便新旧物品同 id 同变体（值层面无差异），
         // 也确需重建，故强制穿透幂等短路。
         boolean mainForce = swap || mainSlotChanged;
@@ -141,8 +148,11 @@ public class FirstPersonRenderHandler {
             beginSwitch(MAIN_STATE, newMain, true, mainForce);
         }
 
-        ItemStack prevOff = OFF_STATE.realItem;
-        OFF_STATE.realItem = newOff;
+        // 仅在检测到物品变化时刷新副手拷贝（同主手，避免取走物品时引用同变漏判）。
+        boolean offRealChanged = !isSameItemStacks(OFF_STATE.realItem, newOff);
+        if (offRealChanged) {
+            OFF_STATE.realItem = newOff.copy();
+        }
 
         // 主手是否霸占副手视野（主手活跃 instance 判定，过渡期为正在收枪的旧 instance）。
         // 必须在副手切换处理之前计算：霸占期间副手不可见，应完全抑制副手掏枪，
@@ -163,9 +173,8 @@ public class FirstPersonRenderHandler {
             }
         } else {
             // 未被霸占的常规路径：副手物品变化 / 渲染变体键变化 / swap 时切换。
-            boolean offItemChanged = !isSameItemStacks(prevOff, newOff);
             boolean offVariantChanged = variantKeyChanged(OFF_STATE, newOff, InteractionHand.OFF_HAND);
-            if (swap || offItemChanged || offVariantChanged) {
+            if (swap || offRealChanged || offVariantChanged) {
                 beginSwitch(OFF_STATE, newOff, false, swap);
             }
         }
