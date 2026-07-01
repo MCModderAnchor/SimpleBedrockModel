@@ -7,7 +7,7 @@
   "mixins": [
     "ServerPlayNetHandlerMixin"
   ],
-  "client": ["client.GameRendererMixin", "client.ItemInHandRendererMixin", "client.PlayerModelMixin"],
+  "client": ["client.GameRendererMixin", "client.ItemInHandRendererMixin", "client.PlayerModelMixin", "client.HumanoidArmorLayerMixin"],
   "injectors": {
     "defaultRequire": 1
   },

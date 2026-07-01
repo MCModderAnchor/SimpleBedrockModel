@@ -111,7 +111,7 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-//    runtimeOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
+    runtimeOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
     compileOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
     jarJar minecraftLibrary("com.maydaymemory:mae:1.1.4") {
         jarJar.ranged(it, "[1.1.4,)")
@@ -135,7 +135,7 @@ dependencies {
 //    runtimeOnly fg.deobf("curse.maven:timeless-and-classics-zero-1028108:8055552-sources-8055584")
 //
 //    runtimeOnly fg.deobf("dev.kosmx.player-anim:player-animation-lib-forge:1.0.2-rc1+1.20")
-//    runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
+    runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
 //    runtimeOnly fg.deobf("curse.maven:accelerated-rendering-1314021:7342975")
 
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.3.6"))

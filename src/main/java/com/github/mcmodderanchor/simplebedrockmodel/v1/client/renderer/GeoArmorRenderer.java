@@ -19,11 +19,12 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.extensions.IForgeItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 // 说是模型，实际上是一个适配器，用来敷衍原版的）
-public class GeoArmorRenderer extends HumanoidModel implements IFPArmorHandRenderer {
+public class GeoArmorRenderer extends HumanoidModel implements IFPArmorHandRenderer, ICustomArmorRenderer {
     protected final BedrockArmorModel model;
     private final ResourceLocation texture;
 
@@ -119,14 +120,29 @@ public class GeoArmorRenderer extends HumanoidModel implements IFPArmorHandRende
         }
     }
 
+    /** 如果被非原版layer意外调了，还是直接用它的吧，不过rendertype是固定的
+     * <br>
+     *  需要正确实现{@link IForgeItem#getArmorTexture}
+     * */
     @Override
     public void renderToBuffer(PoseStack poseStack, @NotNull VertexConsumer buffer, int light, int overlay,
                                float r, float g, float b, float a) {
-        Minecraft mc = Minecraft.getInstance();
-        MultiBufferSource bufferSource = mc.renderBuffers().bufferSource();
-        var vertexConsumer = bufferSource.getBuffer(this.getRenderType(this.getTexture()));
+        float partialTick = Minecraft.getInstance().getFrameTime();
 
-        float partialTick = mc.getFrameTime();
+        poseStack.pushPose();
+        if (this.livingEntity != null && this.equipmentSlot != null && this.original != null) {
+            scaleModelForBaby(poseStack, this.livingEntity, partialTick, this.equipmentSlot, this.original);
+        }
+
+        model.renderToBuffer(poseStack, buffer, light, overlay, r, g, b, a);
+        poseStack.popPose();
+    }
+
+    @Override
+    public void renderArmorToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, int light, int overlay,
+                                    float r, float g, float b, float a) {
+        VertexConsumer vertexConsumer = bufferSource.getBuffer(this.getRenderType(this.getTexture()));
+        float partialTick = Minecraft.getInstance().getFrameTime();
 
         poseStack.pushPose();
         if (this.livingEntity != null && this.equipmentSlot != null && this.original != null) {
@@ -135,8 +151,6 @@ public class GeoArmorRenderer extends HumanoidModel implements IFPArmorHandRende
 
         model.renderToBuffer(poseStack, vertexConsumer, light, overlay, r, g, b, a);
         poseStack.popPose();
-
-        afterRender(poseStack, buffer, light, overlay, r, g, b, a);
     }
 
     public void afterRender(PoseStack poseStack, VertexConsumer buffer, int light, int overlay,

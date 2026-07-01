@@ -2,6 +2,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.IFPArmorHandRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.ICustomArmorRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneState;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeArmorModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
@@ -19,10 +20,14 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.extensions.IForgeItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements IFPArmorHandRenderer {
+/**
+ * 实例盔甲渲染器，默认不支持polymesh
+ */
+public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements IFPArmorHandRenderer, ICustomArmorRenderer {
     protected final TreeBedrockModel model;
     protected final TreeArmorModelInstance instance;
     private final EquipmentSlot armorSlot;
@@ -78,23 +83,37 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
         }
     }
 
+    /** 如果被非原版layer意外调了，还是直接用它的吧，不过rendertype是固定的
+     * <br>
+     *  需要正确实现{@link IForgeItem#getArmorTexture}
+     * */
     @Override
     public void renderToBuffer(PoseStack poseStack, @NotNull VertexConsumer buffer, int light, int overlay,
                                float r, float g, float b, float a) {
-        Minecraft mc = Minecraft.getInstance();
-        MultiBufferSource bufferSource = mc.renderBuffers().bufferSource();
-
-        float partialTick = mc.getFrameTime();
+        float partialTick = Minecraft.getInstance().getFrameTime();
 
         poseStack.pushPose();
         if (this.livingEntity != null && this.equipmentSlot != null && this.original != null) {
             scaleModelForBaby(poseStack, this.livingEntity, partialTick, this.equipmentSlot, this.original);
         }
 
-        this.instance.renderToBuffer(poseStack, bufferSource, getRenderType(this.texture), BedrockModelRenderTypes.polyMeshCutout(this.texture), light, overlay, r, g, b, a);
+        this.instance.renderToBuffer(poseStack, buffer, light, overlay, r, g, b, a);
         poseStack.popPose();
+    }
 
-        afterRender(poseStack, buffer, light, overlay, r, g, b, a);
+    @Override
+    public void renderArmorToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, int light, int overlay,
+                                    float r, float g, float b, float a) {
+        float partialTick = Minecraft.getInstance().getFrameTime();
+
+        poseStack.pushPose();
+        if (this.livingEntity != null && this.equipmentSlot != null && this.original != null) {
+            scaleModelForBaby(poseStack, this.livingEntity, partialTick, this.equipmentSlot, this.original);
+        }
+
+        VertexConsumer vertexConsumer = bufferSource.getBuffer(getRenderType(this.texture));
+        this.instance.renderToBuffer(poseStack, vertexConsumer, light, overlay, r, g, b, a);
+        poseStack.popPose();
     }
 
     public void afterRender(PoseStack poseStack, VertexConsumer buffer, int light, int overlay,

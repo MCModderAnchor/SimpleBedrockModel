@@ -6,6 +6,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelReso
 import example.resource.InnerResourceLoader;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ArmorItem;
@@ -14,6 +15,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 
@@ -45,5 +47,10 @@ public class ExampleArmorItem extends ArmorItem {
                 return this.renderer;
             }
         });
+    }
+
+    @Override
+    public @Nullable String getArmorTexture(ItemStack stack, Entity entity, EquipmentSlot slot, String type) {
+        return "example:textures/armor/defender.png";
     }
 }
