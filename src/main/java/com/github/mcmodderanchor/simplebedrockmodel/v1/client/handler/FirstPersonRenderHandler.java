@@ -291,16 +291,33 @@ public class FirstPersonRenderHandler {
         lastParticleTickNanos = now;
         PARTICLE_SYSTEM.tick(dt);
 
-        tickHandAnimation(MAIN_STATE, event.renderTickTime);
-        tickHandAnimation(OFF_STATE, event.renderTickTime);
+        tickHandAnimation(MAIN_STATE, InteractionHand.MAIN_HAND, event.renderTickTime);
+        tickHandAnimation(OFF_STATE, InteractionHand.OFF_HAND, event.renderTickTime);
     }
 
-    private static void tickHandAnimation(HandRenderState state, float renderTickTime) {
+    private static void tickHandAnimation(HandRenderState state, InteractionHand hand, float renderTickTime) {
         IFPAnimationInstance ani = state.transitioning ? state.previousInstance : state.activeInstance;
-        if (ani != null) {
-            ani.triggerDraw();
-            ani.tick(renderTickTime);
+        if (ani == null || !canActuallyRenderInHand(ani, hand)) {
+            return;
         }
+
+        ani.triggerDraw();
+        ani.tick(renderTickTime);
+    }
+
+    private static boolean canActuallyRenderInHand(IFPAnimationInstance ani, InteractionHand hand) {
+        if (hand == InteractionHand.OFF_HAND && mainHandBlocksOffhand()) {
+            return false;
+        }
+
+        ItemStack stack = ani.currentItem();
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        return getRenderer(stack)
+                .map(renderer -> renderer.canRenderInHand(stack, hand))
+                .orElse(false);
     }
 
     @SubscribeEvent

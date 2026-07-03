@@ -59,10 +59,10 @@ public interface IFPGeoItemRenderer {
      *
      * @param stack 待渲染物品
      * @param hand  渲染所在手
-     * @return 允许渲染返回 {@code true}（默认），否则 {@code false}
+     * @return 允许渲染返回 {@code true}（主手默认），否则 {@code false}
      */
     default boolean canRenderInHand(ItemStack stack, InteractionHand hand) {
-        return true;
+        return hand == InteractionHand.MAIN_HAND;
     }
 
     /**
@@ -95,22 +95,15 @@ public interface IFPGeoItemRenderer {
     }
 
     /**
-     * 应用摄像机动画对世界的变换（只有旋转生效）。
+     * 应用摄像机动画对世界的变换（只有旋转生效）。默认什么都不做。
      */
     default void applyLevelCameraAnimation(ViewportEvent.ComputeCameraAngles event, ItemStack stack, Quaternionf animateRot, float partialTicks) {
-        Quaternionf initialRotation = new Quaternionf().rotateYXZ(-event.getYaw(), -event.getPitch(), -event.getRoll());
-        YXZRotationView rotationView = new YXZRotationView(initialRotation.mul(animateRot));
-        Vector3fc eulerAngle = rotationView.asEulerAngle();
-        event.setYaw(-eulerAngle.y());
-        event.setPitch(-eulerAngle.x());
-        event.setRoll(-eulerAngle.z());
     }
 
     /**
-     * 应用摄像机动画对手持物品的变换（只有旋转生效）。
+     * 应用摄像机动画对手持物品的变换（只有旋转生效）。默认什么都不做。
      */
     default void applyItemInHandCameraAnimation(PoseStack poseStack, ItemStack stack, Quaternionf animateRot, float partialTicks) {
-        poseStack.mulPose(animateRot);
     }
 
     /**
