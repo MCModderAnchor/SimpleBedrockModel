@@ -118,9 +118,7 @@ dependencies {
     localRuntime "curse.maven:playeranimator-658587:7389814"
 
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.3.6"))
-    mcLib jarJar("io.github.llamalad7:mixinextras-neoforge:0.3.6") {
-        jarJar.ranged(it, "[0.3.6,)")
-    }
+    mcLib jarJar("io.github.llamalad7:mixinextras-neoforge:0.3.6")
 
     // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'

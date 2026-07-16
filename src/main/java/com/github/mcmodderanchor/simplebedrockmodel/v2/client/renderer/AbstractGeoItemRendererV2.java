@@ -104,7 +104,7 @@ public abstract class AbstractGeoItemRendererV2 extends BlockEntityWithoutLevelR
         if (ctx.firstPerson()) {
             return;
         }
-        render(stack, ctx, poseStack, bufferSource, light, overlay, Minecraft.getInstance().getPartialTick());
+        render(stack, ctx, poseStack, bufferSource, light, overlay, Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true));
     }
 
     protected void render(ItemStack stack, ItemDisplayContext ctx, PoseStack poseStack, MultiBufferSource bufferSource,
@@ -126,14 +126,14 @@ public abstract class AbstractGeoItemRendererV2 extends BlockEntityWithoutLevelR
         if (slotTexture != null) {
             poseStack.pushPose();
             poseStack.translate(0.5, 0.5, 0);
-            SLOT_MODEL.renderToBuffer(poseStack, bufferSource.getBuffer(RenderType.entityTranslucent(slotTexture)), light, overlay, 1.0F, 1.0F, 1.0F, 1.0F);
+            SLOT_MODEL.renderToBuffer(poseStack, bufferSource.getBuffer(RenderType.entityTranslucent(slotTexture)), light, overlay, 0xFFFFFFFF);
             poseStack.popPose();
         } else if (!hasModel) {
             // 模型和 gui texture 都不存在，渲染 missing texture
             poseStack.pushPose();
             poseStack.translate(0.5, 0.5, 0);
             RenderType renderType = RenderType.entityTranslucent(MissingTextureAtlasSprite.getLocation());
-            SLOT_MODEL.renderToBuffer(poseStack, bufferSource.getBuffer(renderType), light, overlay, 1.0F, 1.0F, 1.0F, 1.0F);
+            SLOT_MODEL.renderToBuffer(poseStack, bufferSource.getBuffer(renderType), light, overlay, 0xFFFFFFFF);
             poseStack.popPose();
         }
     }
