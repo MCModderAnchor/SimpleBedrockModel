@@ -4,6 +4,14 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmor
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.GeoArmorRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockCube;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer.GeoArmorRendererV2;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneState;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeArmorModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.CubeBox;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.CubePerFace;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.ICube;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBoneDefinition;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -12,10 +20,13 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import yesman.epicfight.api.client.event.types.render.AnimatedArmorTextureEvent;
 import yesman.epicfight.api.client.model.Mesh;
@@ -46,6 +57,8 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
 
         if (extensionRenderer instanceof GeoArmorRenderer geoArmorRenderer) {
             event.setResultLocation(geoArmorRenderer.getTexture());
+        } else if (extensionRenderer instanceof GeoArmorRendererV2 geoArmorRenderer) {
+            event.setResultLocation(geoArmorRenderer.getTexture());
         }
     }
 
@@ -68,14 +81,34 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         }
     }
 
+    static class TreeModelPartition {
+        final CubeTransformer cubeTransformer;
+        final BoneState bone;
+
+        TreeModelPartition(CubeTransformer cubeTransformer, BoneState bone) {
+            this.cubeTransformer = cubeTransformer;
+            this.bone = bone;
+        }
+    }
+
     @Override
     public SkinnedMesh transformArmorModel(HumanoidModel<?> humanoidModel) {
-        if (!(humanoidModel instanceof GeoArmorRenderer geoArmor)) {
-            return null;
+        if (humanoidModel instanceof GeoArmorRenderer geoArmor) {
+            return transformArmorModel(geoArmor.getModel(), geoArmor.getEquipmentSlot());
+        }
+        if (humanoidModel instanceof GeoArmorRendererV2 geoArmor) {
+            EquipmentSlot slot = geoArmor.getCurrentSlot() != null ? geoArmor.getCurrentSlot() : geoArmor.getArmorSlot();
+            return transformTreeArmorModel(geoArmor.getModel(), geoArmor.getInstance(), slot);
         }
 
-        BedrockArmorModel model = geoArmor.getModel();
+        return null;
+    }
 
+    public static SkinnedMesh transformArmorModel(BedrockArmorModel model) {
+        return transformArmorModel(model, null);
+    }
+
+    public static SkinnedMesh transformArmorModel(BedrockArmorModel model, @Nullable EquipmentSlot equipmentSlot) {
         // Reset to bind pose to get default bone transforms
         model.applyPose(model.getBindPose());
 
@@ -99,21 +132,81 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         resetRotation(leftBootBone);
 
         List<BedrockModelPartition> partitions = Lists.newArrayList();
-        partitions.add(new BedrockModelPartition(HEAD, headBone));
-        partitions.add(new BedrockModelPartition(CHEST, bodyBone));
-        partitions.add(new BedrockModelPartition(RIGHT_ARM, rightArmBone));
-        partitions.add(new BedrockModelPartition(LEFT_ARM, leftArmBone));
-        partitions.add(new BedrockModelPartition(LEFT_LEG, leftLegBone));
-        partitions.add(new BedrockModelPartition(RIGHT_LEG, rightLegBone));
-        partitions.add(new BedrockModelPartition(LEFT_FEET, leftBootBone));
-        partitions.add(new BedrockModelPartition(RIGHT_FEET, rightBootBone));
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.HEAD) {
+            partitions.add(new BedrockModelPartition(HEAD, headBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.CHEST) {
+            partitions.add(new BedrockModelPartition(CHEST, bodyBone));
+            partitions.add(new BedrockModelPartition(RIGHT_ARM, rightArmBone));
+            partitions.add(new BedrockModelPartition(LEFT_ARM, leftArmBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.LEGS) {
+            partitions.add(new BedrockModelPartition(LEFT_LEG, leftLegBone));
+            partitions.add(new BedrockModelPartition(RIGHT_LEG, rightLegBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.FEET) {
+            partitions.add(new BedrockModelPartition(LEFT_FEET, leftBootBone));
+            partitions.add(new BedrockModelPartition(RIGHT_FEET, rightBootBone));
+        }
 
         return bakeMeshFromBones(partitions);
+    }
+
+    public static SkinnedMesh transformTreeArmorModel(TreeBedrockModel model, TreeArmorModelInstance instance) {
+        return transformTreeArmorModel(model, instance, null);
+    }
+
+    public static SkinnedMesh transformTreeArmorModel(TreeBedrockModel model, TreeArmorModelInstance instance, @Nullable EquipmentSlot equipmentSlot) {
+        instance.resetPose();
+
+        BoneState headBone = instance.getArmorHead();
+        BoneState bodyBone = instance.getArmorBody();
+        BoneState rightArmBone = instance.getArmorRightArm();
+        BoneState leftArmBone = instance.getArmorLeftArm();
+        BoneState rightLegBone = instance.getArmorRightLeg();
+        BoneState leftLegBone = instance.getArmorLeftLeg();
+        BoneState rightBootBone = instance.getArmorRightBoot();
+        BoneState leftBootBone = instance.getArmorLeftBoot();
+
+        resetRotation(headBone);
+        resetRotation(bodyBone);
+        resetRotation(rightArmBone);
+        resetRotation(leftArmBone);
+        resetRotation(rightLegBone);
+        resetRotation(leftLegBone);
+        resetRotation(rightBootBone);
+        resetRotation(leftBootBone);
+
+        List<TreeModelPartition> partitions = Lists.newArrayList();
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.HEAD) {
+            partitions.add(new TreeModelPartition(HEAD, headBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.CHEST) {
+            partitions.add(new TreeModelPartition(CHEST, bodyBone));
+            partitions.add(new TreeModelPartition(RIGHT_ARM, rightArmBone));
+            partitions.add(new TreeModelPartition(LEFT_ARM, leftArmBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.LEGS) {
+            partitions.add(new TreeModelPartition(LEFT_LEG, leftLegBone));
+            partitions.add(new TreeModelPartition(RIGHT_LEG, rightLegBone));
+        }
+        if (equipmentSlot == null || equipmentSlot == EquipmentSlot.FEET) {
+            partitions.add(new TreeModelPartition(LEFT_FEET, leftBootBone));
+            partitions.add(new TreeModelPartition(RIGHT_FEET, rightBootBone));
+        }
+
+        return bakeMeshFromTreeBones(model, instance, partitions);
     }
 
     private static void resetRotation(@Nullable BedrockBone bone) {
         if (bone == null) return;
         bone.rotation.identity();
+    }
+
+    private static void resetRotation(@Nullable BoneState bone) {
+        if (bone == null) return;
+        bone.rotation.identity();
+        bone.rotationInEuler.zero();
     }
 
     private static SkinnedMesh bakeMeshFromBones(List<BedrockModelPartition> partitions) {
@@ -124,6 +217,21 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
 
         for (BedrockModelPartition partition : partitions) {
             bake(poseStack, partition, partition.bone != null ? partition.bone.toString() : "",
+                    partition.bone, vertices, indices, indexCounter);
+        }
+
+        return SingleGroupVertexBuilder.loadVertexInformation(vertices, indices);
+    }
+
+    private static SkinnedMesh bakeMeshFromTreeBones(TreeBedrockModel model, TreeArmorModelInstance instance,
+                                                     List<TreeModelPartition> partitions) {
+        List<SingleGroupVertexBuilder> vertices = Lists.newArrayList();
+        Map<MeshPartDefinition, IntList> indices = Maps.newHashMap();
+        PoseStack poseStack = new PoseStack();
+        IndexCounter indexCounter = new IndexCounter();
+
+        for (TreeModelPartition partition : partitions) {
+            bakeTree(poseStack, model, instance, partition, partition.bone != null ? partition.bone.name() : "",
                     partition.bone, vertices, indices, indexCounter);
         }
 
@@ -141,11 +249,34 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         MeshPartDefinition partDefinition = BedrockMeshPart.of(partName);
 
         for (BedrockCube cube : bone.cubes) {
-            partition.cubeTransformer.bakeCube(poseStack, partDefinition, cube, vertices, indices, indexCounter);
+            partition.cubeTransformer.bakeCube(poseStack, partDefinition, new BedrockArmorCube(cube), vertices, indices, indexCounter);
         }
 
         for (BedrockBone childBone : bone.getChildren()) {
             bake(poseStack, partition, partName, childBone, vertices, indices, indexCounter);
+        }
+
+        poseStack.popPose();
+    }
+
+    private static void bakeTree(PoseStack poseStack, TreeBedrockModel model, TreeArmorModelInstance instance,
+                                 TreeModelPartition partition, String partName, @Nullable BoneState bone,
+                                 List<SingleGroupVertexBuilder> vertices,
+                                 Map<MeshPartDefinition, IntList> indices, IndexCounter indexCounter) {
+        if (bone == null) return;
+
+        poseStack.pushPose();
+        bone.translateAndRotateAndScale(poseStack);
+
+        MeshPartDefinition partDefinition = BedrockMeshPart.of(partName);
+        TreeBoneDefinition definition = model.bone(bone.index());
+
+        for (ICube cube : definition.cubes()) {
+            partition.cubeTransformer.bakeCube(poseStack, partDefinition, new TreeArmorCube(cube), vertices, indices, indexCounter);
+        }
+
+        for (int childIndex : definition.children()) {
+            bakeTree(poseStack, model, instance, partition, partName, instance.getBone(childIndex), vertices, indices, indexCounter);
         }
 
         poseStack.popPose();
@@ -157,15 +288,16 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
      * Compute 8 vertex positions for a cube, transformed by the pose matrix.
      * Same math as BedrockCubeBox.prepareVertices but thread-safe (no shared static arrays).
      */
-    static Vector3f[] computeVertices(Matrix4f pose, BedrockCube cube) {
+    static Vector3f[] computeVertices(Matrix4f pose, ArmorCube cube) {
+        Matrix4f cubePose = cube.transformedPose(pose);
         float x = cube.x(), y = cube.y(), z = cube.z();
         float w = cube.width(), h = cube.height(), d = cube.depth();
 
-        Vector3f edgeX = new Vector3f(pose.m00(), pose.m01(), pose.m02()).mul(w);
-        Vector3f edgeY = new Vector3f(pose.m10(), pose.m11(), pose.m12()).mul(h);
-        Vector3f edgeZ = new Vector3f(pose.m20(), pose.m21(), pose.m22()).mul(d);
+        Vector3f edgeX = new Vector3f(cubePose.m00(), cubePose.m01(), cubePose.m02()).mul(w);
+        Vector3f edgeY = new Vector3f(cubePose.m10(), cubePose.m11(), cubePose.m12()).mul(h);
+        Vector3f edgeZ = new Vector3f(cubePose.m20(), cubePose.m21(), cubePose.m22()).mul(d);
 
-        Vector3f v0 = new Vector3f(x, y, z).mulPosition(pose);
+        Vector3f v0 = new Vector3f(x, y, z).mulPosition(cubePose);
         Vector3f v1 = new Vector3f(v0).add(edgeX);
         Vector3f v2 = new Vector3f(v1).add(edgeY);
         Vector3f v3 = new Vector3f(v0).add(edgeY);
@@ -177,7 +309,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         return new Vector3f[]{v0, v1, v2, v3, v4, v5, v6, v7};
     }
 
-    static Vec3 getCenterOfCube(PoseStack poseStack, BedrockCube cube) {
+    static Vec3 getCenterOfCube(PoseStack poseStack, ArmorCube cube) {
         Matrix4f matrix = poseStack.last().pose();
         Vector3f[] verts = computeVertices(matrix, cube);
 
@@ -208,6 +340,172 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
 
     static PosTexVertex makeVertex(Vector3f pos, float u, float v) {
         return new PosTexVertex(pos.x, pos.y, pos.z, u, v);
+    }
+
+    private interface ArmorCube {
+        float x();
+
+        float y();
+
+        float z();
+
+        float width();
+
+        float height();
+
+        float depth();
+
+        float getU(int face, int vertex);
+
+        float getV(int face, int vertex);
+
+        boolean isEmptyFace(int face);
+
+        Matrix4f transformedPose(Matrix4f pose);
+
+        Vector3f transformedNormal(Direction direction, Matrix3f normalMatrix);
+    }
+
+    private record BedrockArmorCube(BedrockCube cube) implements ArmorCube {
+        @Override
+        public float x() {
+            return cube.x();
+        }
+
+        @Override
+        public float y() {
+            return cube.y();
+        }
+
+        @Override
+        public float z() {
+            return cube.z();
+        }
+
+        @Override
+        public float width() {
+            return cube.width();
+        }
+
+        @Override
+        public float height() {
+            return cube.height();
+        }
+
+        @Override
+        public float depth() {
+            return cube.depth();
+        }
+
+        @Override
+        public float getU(int face, int vertex) {
+            return cube.getU(face, vertex);
+        }
+
+        @Override
+        public float getV(int face, int vertex) {
+            return cube.getV(face, vertex);
+        }
+
+        @Override
+        public boolean isEmptyFace(int face) {
+            return cube.isEmptyFace(face);
+        }
+
+        @Override
+        public Matrix4f transformedPose(Matrix4f pose) {
+            return pose;
+        }
+
+        @Override
+        public Vector3f transformedNormal(Direction direction, Matrix3f normalMatrix) {
+            return new Vector3f(direction.step()).mul(normalMatrix);
+        }
+    }
+
+    private record TreeArmorCube(ICube cube) implements ArmorCube {
+        @Override
+        public float x() {
+            return cube.x();
+        }
+
+        @Override
+        public float y() {
+            return cube.y();
+        }
+
+        @Override
+        public float z() {
+            return cube.z();
+        }
+
+        @Override
+        public float width() {
+            return cube.width();
+        }
+
+        @Override
+        public float height() {
+            return cube.height();
+        }
+
+        @Override
+        public float depth() {
+            return cube.depth();
+        }
+
+        @Override
+        public float getU(int face, int vertex) {
+            if (cube instanceof CubeBox box) {
+                return box.uv(box.uvOrder(face, vertex == 0 || vertex == 3 ? 1 : 0));
+            }
+            if (cube instanceof CubePerFace perFace) {
+                return perFace.faceUv(face)[vertex * 2];
+            }
+            return 0.0F;
+        }
+
+        @Override
+        public float getV(int face, int vertex) {
+            if (cube instanceof CubeBox box) {
+                return box.uv(box.uvOrder(face, vertex <= 1 ? 2 : 3));
+            }
+            if (cube instanceof CubePerFace perFace) {
+                return perFace.faceUv(face)[vertex * 2 + 1];
+            }
+            return 0.0F;
+        }
+
+        @Override
+        public boolean isEmptyFace(int face) {
+            return cube instanceof CubePerFace perFace && perFace.isEmptyFace(face);
+        }
+
+        @Override
+        public Matrix4f transformedPose(Matrix4f pose) {
+            if (!cube.hasRotation()) {
+                return pose;
+            }
+            Matrix4f transformed = new Matrix4f(pose);
+            float[] pivot = cube.pivot();
+            Quaternionf rotation = cube.rotation();
+            transformed.translate(pivot[0], pivot[1], pivot[2]);
+            transformed.rotate(rotation);
+            transformed.translate(-pivot[0], -pivot[1], -pivot[2]);
+            return transformed;
+        }
+
+        @Override
+        public Vector3f transformedNormal(Direction direction, Matrix3f normalMatrix) {
+            Vector3f normal = new Vector3f(direction.step());
+            if (cube.hasRotation()) {
+                normal.rotate(cube.rotation());
+                if (normal.lengthSquared() > 1.0E-12f) normal.normalize();
+            }
+            normal.mul(normalMatrix);
+            if (normal.lengthSquared() > 1.0E-12f) normal.normalize();
+            return normal;
+        }
     }
 
     /**
@@ -274,7 +572,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
     // ========== Cube Transformer hierarchy ==========
 
     static abstract class CubeTransformer {
-        abstract void bakeCube(PoseStack poseStack, MeshPartDefinition partName, BedrockCube cube,
+        abstract void bakeCube(PoseStack poseStack, MeshPartDefinition partName, ArmorCube cube,
                                List<SingleGroupVertexBuilder> vertices, Map<MeshPartDefinition, IntList> indices,
                                IndexCounter indexCounter);
     }
@@ -287,7 +585,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         }
 
         @Override
-        void bakeCube(PoseStack poseStack, MeshPartDefinition partName, BedrockCube cube,
+        void bakeCube(PoseStack poseStack, MeshPartDefinition partName, ArmorCube cube,
                       List<SingleGroupVertexBuilder> vertices, Map<MeshPartDefinition, IntList> indices,
                       IndexCounter indexCounter) {
             Matrix4f pose = poseStack.last().pose();
@@ -298,8 +596,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
 
                 int[] order = BedrockCube.VERTEX_ORDER[face];
                 Direction dir = getFaceDirection(face);
-                Vector3f norm = new Vector3f(dir.step());
-                norm.mul(poseStack.last().normal());
+                Vector3f norm = cube.transformedNormal(dir, poseStack.last().normal());
 
                 for (int v = 0; v < 4; v++) {
                     Vector3f pos = cubeVerts[order[v]];
@@ -341,7 +638,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         }
 
         @Override
-        void bakeCube(PoseStack poseStack, MeshPartDefinition partName, BedrockCube cube,
+        void bakeCube(PoseStack poseStack, MeshPartDefinition partName, ArmorCube cube,
                       List<SingleGroupVertexBuilder> vertices, Map<MeshPartDefinition, IntList> indices,
                       IndexCounter indexCounter) {
             Vec3 centerOfCube = getCenterOfCube(poseStack, cube);
@@ -446,8 +743,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
             }
 
             for (AnimatedPolygon polygon : xyClipPolygons) {
-                Vector3f norm = new Vector3f(polygon.normal);
-                norm.mul(poseStack.last().normal());
+                Vector3f norm = cube.transformedNormal(getFaceDirection(polygon.faceIndex), poseStack.last().normal());
 
                 for (AnimatedVertex vertex : polygon.animatedVertexPositions) {
                     float weight1 = vertex.weight.x;
@@ -542,7 +838,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
         }
 
         @Override
-        void bakeCube(PoseStack poseStack, MeshPartDefinition partName, BedrockCube cube,
+        void bakeCube(PoseStack poseStack, MeshPartDefinition partName, ArmorCube cube,
                       List<SingleGroupVertexBuilder> vertices, Map<MeshPartDefinition, IntList> indices,
                       IndexCounter indexCounter) {
             Vec3 centerOfCube = getCenterOfCube(poseStack, cube);
@@ -636,8 +932,7 @@ public class BedrockArmorTransformer extends HumanoidModelTransformer {
             }
 
             for (AnimatedPolygon quad : polygons) {
-                Vector3f norm = new Vector3f(quad.normal);
-                norm.mul(poseStack.last().normal());
+                Vector3f norm = cube.transformedNormal(getFaceDirection(quad.faceIndex), poseStack.last().normal());
 
                 for (AnimatedVertex vertex : quad.animatedVertexPositions) {
                     vertices.add(new SingleGroupVertexBuilder()

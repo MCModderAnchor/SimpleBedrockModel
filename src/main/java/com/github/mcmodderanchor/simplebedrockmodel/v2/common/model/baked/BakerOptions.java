@@ -1,4 +1,4 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.AnimationBone;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
@@ -17,6 +17,18 @@ public record BakerOptions(
         boolean bakeStaticGeometry,
         boolean debugFoldedTree
 ) {
+    public static final Set<String> ARMOR_BONES = Set.of(
+            "armorHead",
+            "armorBody",
+            "armorRightArm",
+            "armorLeftArm",
+            "armorRightLeg",
+            "armorLeftLeg",
+            "armorRightBoot",
+            "armorLeftBoot"
+    );
+    public static final BakerOptions ARMOR = new BakerOptions(Set.of(), ARMOR_BONES, true, false);
+
     public BakerOptions {
         animatedBones = Set.copyOf(animatedBones);
         preservedBones = Set.copyOf(preservedBones);

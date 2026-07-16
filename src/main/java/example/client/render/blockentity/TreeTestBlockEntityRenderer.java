@@ -2,8 +2,8 @@ package example.client.render.blockentity;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import com.google.common.base.Suppliers;
@@ -14,8 +14,8 @@ import com.maydaymemory.mae.blend.EulerAdditiveBlender;
 import com.maydaymemory.mae.blend.SimpleEulerAdditiveBlender;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import example.animation.MolangTestAnimationContext;
 import example.animation.TestBlockAnimationContext;
+import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
 import example.resource.KnownResources;
@@ -32,23 +32,23 @@ import org.jetbrains.annotations.NotNull;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
-public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockEntity> {
+public class TreeTestBlockEntityRenderer implements BlockEntityRenderer<TestBlockEntity> {
     private static final ResourceLocation TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/test.png");
     private static final ResourceLocation POLY_MESH_TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/vct.png");
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
-    private final Supplier<BakedBedrockModel> testModelSupplier;
-    private final Supplier<BakedBedrockModel> polyMeshTestModelSupplier;
-    private final WeakHashMap<TestBlockEntity, BakedModelInstance> testInstanceCache = new WeakHashMap<>();
-    private final WeakHashMap<TestBlockEntity, BakedModelInstance> polyMeshInstanceCache = new WeakHashMap<>();
+    private final Supplier<TreeBedrockModel> testModelSupplier;
+    private final Supplier<TreeBedrockModel> polyMeshTestModelSupplier;
+    private final WeakHashMap<TestBlockEntity, TreeModelInstance> testInstanceCache = new WeakHashMap<>();
+    private final WeakHashMap<TestBlockEntity, TreeModelInstance> polyMeshInstanceCache = new WeakHashMap<>();
 
-    public V2TestBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
+    public TreeTestBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
         this.testModelSupplier = Suppliers.memoize(this::loadTestModel);
         this.polyMeshTestModelSupplier = Suppliers.memoize(this::loadPolyMeshTestModel);
     }
 
-    private BakedBedrockModel loadTestModel() {
-        BakedBedrockModel model = BedrockModelResources.getInstance().getBakedModel(KnownResources.TEST);
+    private TreeBedrockModel loadTestModel() {
+        TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(KnownResources.TEST);
         BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.TEST);
         if (model != null && animationFile != null) {
             TestBlockAnimationContext.initialize(animationFile, model);
@@ -56,32 +56,32 @@ public class V2TestBlockEntityRenderer implements BlockEntityRenderer<TestBlockE
         return model;
     }
 
-    private BakedBedrockModel loadPolyMeshTestModel() {
-        return BedrockModelResources.getInstance().getBakedModel(KnownResources.POLY_MESH_TEST);
+    private TreeBedrockModel loadPolyMeshTestModel() {
+        return BedrockModelResources.getInstance().getTreeModel(KnownResources.POLY_MESH_TEST);
     }
 
     @Override
     public void render(@NotNull TestBlockEntity blockEntity, float partialTick, @NotNull PoseStack poseStack,
                        @NotNull MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         boolean polyMeshTest = blockEntity.getBlockState().is(ExampleModRegister.POLY_MESH_TEST_BLOCK);
-        BakedBedrockModel model = polyMeshTest ? polyMeshTestModelSupplier.get() : testModelSupplier.get();
+        TreeBedrockModel model = polyMeshTest ? polyMeshTestModelSupplier.get() : testModelSupplier.get();
         if (model == null) {
             return;
         }
-        WeakHashMap<TestBlockEntity, BakedModelInstance> instanceCache = polyMeshTest ? polyMeshInstanceCache : testInstanceCache;
-        BakedModelInstance instance = instanceCache.computeIfAbsent(blockEntity, ignored -> model.createInstance());
-        instance.resetPose();
+
+        WeakHashMap<TestBlockEntity, TreeModelInstance> instanceCache = polyMeshTest ? polyMeshInstanceCache : testInstanceCache;
+        TreeModelInstance instance = instanceCache.computeIfAbsent(blockEntity, ignored -> model.createInstance());
+//        instance.resetPose();
 
         if (!polyMeshTest) {
-//            TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
-//            animationInstance.renderTick();
-//            Pose animationPose = animationInstance.getStateMachine().getPose();
+            TestBlockAnimationInstance animationInstance = blockEntity.getAnimationInstance();
+            animationInstance.renderTick();
+            Pose animationPose = animationInstance.getStateMachine().getPose();
 
-            MolangTestAnimationContext.tick();
-            Pose animationPose = MolangTestAnimationContext.evaluatePose();
-
-            Pose blended = BLENDER.blend(instance.getBindPose(), animationPose);
-            instance.applyPose(blended);
+            if (animationPose != null) {
+                Pose blended = BLENDER.blend(instance.getBindPose(), animationPose);
+                instance.applyPose(blended);
+            }
         }
 
         ResourceLocation texture = polyMeshTest ? POLY_MESH_TEST_TEXTURE : TEST_TEXTURE;

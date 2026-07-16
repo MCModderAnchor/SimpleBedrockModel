@@ -93,10 +93,10 @@ public class BedrockBone {
         PoseStack.Pose pose = poseStack.last();
 
         if (meshesPass) {
-            if (!this.meshes.isEmpty() && !AcceleratedRenderingCompat.renderMeshes(this, getAcceleratedCache(), pose, consumer, packedLight, overlay, red, green, blue, alpha)) {
+            if (!this.meshes.isEmpty() && !AcceleratedRenderingCompat.renderMeshes(this, pose, consumer, packedLight, overlay, red, green, blue, alpha)) {
                 this.compileMeshes(pose, consumer, packedLight, overlay, red, green, blue, alpha);
             }
-        } else if (!this.cubes.isEmpty() && !AcceleratedRenderingCompat.renderCubes(this, getAcceleratedCache(), pose, consumer, packedLight, overlay, red, green, blue, alpha)) {
+        } else if (!this.cubes.isEmpty() && !AcceleratedRenderingCompat.renderCubes(this, pose, consumer, packedLight, overlay, red, green, blue, alpha)) {
             this.compile(pose, consumer, packedLight, overlay, red, green, blue, alpha);
         }
 
@@ -149,7 +149,7 @@ public class BedrockBone {
     }
 
     @OnlyIn(Dist.CLIENT)
-    private AcceleratedBedrockBoneCache getAcceleratedCache() {
+    public AcceleratedBedrockBoneCache getAcceleratedCache() {
         if (acceleratedCache == null) {
             acceleratedCache = new AcceleratedBedrockBoneCache();
         }

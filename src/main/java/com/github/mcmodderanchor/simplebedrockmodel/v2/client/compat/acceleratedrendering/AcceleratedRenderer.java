@@ -1,16 +1,18 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.acceleratedrendering;
 
 import com.github.argon4w.acceleratedrendering.core.CoreFeature;
-import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.IBufferGraph;
 import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.IAcceleratedVertexConsumer;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.IBufferGraph;
 import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.VertexConsumerExtension;
 import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.renderers.IAcceleratedRenderer;
 import com.github.argon4w.acceleratedrendering.core.meshes.IMesh;
 import com.github.argon4w.acceleratedrendering.core.meshes.collectors.CulledMeshCollector;
 import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedQuadData;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedVertexData;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedQuadData;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedVertexData;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBoneDefinition;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeGeometryWriter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.util.FastColor;
@@ -21,18 +23,23 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 import java.util.Map;
-import java.util.function.Consumer;
 
 @OnlyIn(Dist.CLIENT)
 public final class AcceleratedRenderer {
-    private final IAcceleratedRenderer<RenderContext> cachedMeshRenderer = this::renderCachedMesh;
+    private static final Matrix4f IDENTITY_TRANSFORM = new Matrix4f();
+    private static final Matrix3f IDENTITY_NORMAL = new Matrix3f();
+
+    private final IAcceleratedRenderer<BakedGeometryChunk> cachedQuadRenderer = this::renderCachedQuads;
+    private final IAcceleratedRenderer<BakedGeometryChunk> cachedVertexRenderer = this::renderCachedVertices;
+    private final IAcceleratedRenderer<TreeBoneDefinition> cachedCubeRenderer = this::renderCachedCubes;
+    private final IAcceleratedRenderer<TreeBoneDefinition> cachedPolyMeshRenderer = this::renderCachedPolyMeshes;
 
     public boolean renderQuads(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
                                int lightmap, int overlay, float red, float green, float blue, float alpha) {
         if (chunk == null || !chunk.hasQuads()) {
             return false;
         }
-        return render(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha, true);
+        return render(chunk, cachedQuadRenderer, consumer, pose, lightmap, overlay, red, green, blue, alpha);
     }
 
     public boolean renderVertices(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
@@ -40,43 +47,108 @@ public final class AcceleratedRenderer {
         if (chunk == null || !chunk.hasVertices()) {
             return false;
         }
-        return render(chunk, consumer, pose, lightmap, overlay, red, green, blue, alpha, false);
+        return render(chunk, cachedVertexRenderer, consumer, pose, lightmap, overlay, red, green, blue, alpha);
     }
 
-    private boolean render(BakedGeometryChunk chunk, VertexConsumer consumer, PoseStack.Pose pose,
-                           int lightmap, int overlay, float red, float green, float blue, float alpha, boolean quads) {
+    public boolean renderCubes(TreeBoneDefinition bone, VertexConsumer consumer, PoseStack.Pose pose,
+                               int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        if (!bone.hasQuads()) {
+            return false;
+        }
+        return render(bone, cachedCubeRenderer, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
+
+    public boolean renderPolyMeshes(TreeBoneDefinition bone, VertexConsumer consumer, PoseStack.Pose pose,
+                                    int lightmap, int overlay, float red, float green, float blue, float alpha) {
+        if (!bone.hasVertices()) {
+            return false;
+        }
+        return render(bone, cachedPolyMeshRenderer, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
+
+    private <T> boolean render(T source, IAcceleratedRenderer<T> renderer,
+                               VertexConsumer consumer, PoseStack.Pose pose,
+                               int lightmap, int overlay, float red, float green, float blue, float alpha) {
         IAcceleratedVertexConsumer extension = getExtension(consumer);
         if (!canRender(extension)) {
             return false;
         }
 
-        AcceleratedBedrockGeometryCache cache = chunk.getOrCreateCache();
-        Map<IBufferGraph, IMesh> meshCache = quads ? cache.quadMeshes : cache.triangleMeshes;
-        int color = packColor(red, green, blue, alpha);
-        RenderContext context = new RenderContext(meshCache, builder -> {
-            if (quads) {
-                emitQuads(builder, chunk.quads());
-            } else {
-                emitVertices(builder, chunk.vertices());
-            }
-        });
-        extension.doRender(cachedMeshRenderer, context, pose.pose(), pose.normal(), lightmap, overlay, color);
+        extension.doRender(renderer, source, pose.pose(), pose.normal(), lightmap, overlay, packColor(red, green, blue, alpha));
         return true;
     }
 
-    private void renderCachedMesh(VertexConsumer vertexConsumer, RenderContext context, Matrix4f transform, Matrix3f normal,
-                                  int lightmap, int overlay, int color) {
+    private void renderCachedQuads(VertexConsumer vertexConsumer, BakedGeometryChunk chunk, Matrix4f transform, Matrix3f normal,
+                                   int lightmap, int overlay, int color) {
         IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
-        IMesh mesh = context.cache.get(extension);
+        Map<IBufferGraph, IMesh> meshCache = chunk.getOrCreateCache().quadMeshes;
+        IMesh mesh = meshCache.get(extension);
 
         extension.beginTransform(transform, normal);
         if (mesh == null) {
             CulledMeshCollector collector = new CulledMeshCollector(extension);
             VertexConsumer builder = extension.decorate(collector);
-            context.meshEmitter.accept(builder);
+            emitQuads(builder, chunk.quads());
             collector.flush();
             mesh = AcceleratedEntityRenderingFeature.getMeshType().getBuilder().build(collector);
-            context.cache.put(extension, mesh);
+            meshCache.put(extension, mesh);
+        }
+        mesh.write(extension, color, lightmap, overlay);
+        extension.endTransform();
+    }
+
+    private void renderCachedVertices(VertexConsumer vertexConsumer, BakedGeometryChunk chunk, Matrix4f transform, Matrix3f normal,
+                                      int lightmap, int overlay, int color) {
+        IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
+        Map<IBufferGraph, IMesh> meshCache = chunk.getOrCreateCache().triangleMeshes;
+        IMesh mesh = meshCache.get(extension);
+
+        extension.beginTransform(transform, normal);
+        if (mesh == null) {
+            CulledMeshCollector collector = new CulledMeshCollector(extension);
+            VertexConsumer builder = extension.decorate(collector);
+            emitVertices(builder, chunk.vertices());
+            collector.flush();
+            mesh = AcceleratedEntityRenderingFeature.getMeshType().getBuilder().build(collector);
+            meshCache.put(extension, mesh);
+        }
+        mesh.write(extension, color, lightmap, overlay);
+        extension.endTransform();
+    }
+
+    private void renderCachedCubes(VertexConsumer vertexConsumer, TreeBoneDefinition bone, Matrix4f transform, Matrix3f normal,
+                                   int lightmap, int overlay, int color) {
+        IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
+        Map<IBufferGraph, IMesh> meshCache = bone.getOrCreateCache().quadMeshes;
+        IMesh mesh = meshCache.get(extension);
+
+        extension.beginTransform(transform, normal);
+        if (mesh == null) {
+            CulledMeshCollector collector = new CulledMeshCollector(extension);
+            VertexConsumer builder = extension.decorate(collector);
+            TreeGeometryWriter.writeCubesFallback(bone.cubes(), builder, IDENTITY_TRANSFORM, IDENTITY_NORMAL, 0, 0, 1, 1, 1, 1);
+            collector.flush();
+            mesh = AcceleratedEntityRenderingFeature.getMeshType().getBuilder().build(collector);
+            meshCache.put(extension, mesh);
+        }
+        mesh.write(extension, color, lightmap, overlay);
+        extension.endTransform();
+    }
+
+    private void renderCachedPolyMeshes(VertexConsumer vertexConsumer, TreeBoneDefinition bone, Matrix4f transform, Matrix3f normal,
+                                        int lightmap, int overlay, int color) {
+        IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
+        Map<IBufferGraph, IMesh> meshCache = bone.getOrCreateCache().triangleMeshes;
+        IMesh mesh = meshCache.get(extension);
+
+        extension.beginTransform(transform, normal);
+        if (mesh == null) {
+            CulledMeshCollector collector = new CulledMeshCollector(extension);
+            VertexConsumer builder = extension.decorate(collector);
+            TreeGeometryWriter.writePolyMeshesFallback(bone.polyMeshes(), builder, IDENTITY_TRANSFORM, IDENTITY_NORMAL, 0, 0, 1, 1, 1, 1);
+            collector.flush();
+            mesh = AcceleratedEntityRenderingFeature.getMeshType().getBuilder().build(collector);
+            meshCache.put(extension, mesh);
         }
         mesh.write(extension, color, lightmap, overlay);
         extension.endTransform();
@@ -145,8 +217,5 @@ public final class AcceleratedRenderer {
                 (int) (green * 255.0f),
                 (int) (blue * 255.0f)
         );
-    }
-
-    private record RenderContext(Map<IBufferGraph, IMesh> cache, Consumer<VertexConsumer> meshEmitter) {
     }
 }

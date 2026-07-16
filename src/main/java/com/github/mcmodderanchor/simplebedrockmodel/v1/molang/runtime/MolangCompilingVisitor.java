@@ -118,26 +118,33 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                     final String name = ((IdentifierExpression) objectExpr).name();
                     final String property = ((AccessExpression) left).property();
 
-                    if (name.equals("temp") || name.equals("t")) {
-                        final CompileVisitResult result = expression.right().visit(this);
+                    if (name.equalsIgnoreCase("temp") || name.equalsIgnoreCase("t")) {
+                        final Type previousExpectedType = expectedType;
+                        expectedType = Type.DOUBLE_TYPE;
+                        expression.right().visit(this);
+                        expectedType = previousExpectedType;
+
                         final int localIndex = localsByName.computeIfAbsent(property, k -> {
                             int index = functionCompileState.maxLocals();
-                            if (result.lastPushedType() != null && result.lastPushedType().getSize() == 2) {
-                                functionCompileState.maxLocals(index + 2);
-                            } else {
-                                functionCompileState.maxLocals(index + 1);
-                            }
+                            functionCompileState.maxLocals(index + 2);
                             return index;
                         });
+                        mv.visitInsn(Opcodes.DUP2);
                         AsmUtil.addStore(mv, localIndex, Type.DOUBLE_TYPE);
-                        return null;
+                        if (previousExpectedType != null && !previousExpectedType.equals(Type.DOUBLE_TYPE)) {
+                            AsmUtil.addCast(mv, Type.DOUBLE_TYPE, previousExpectedType);
+                            return new CompileVisitResult(previousExpectedType);
+                        }
+                        return new CompileVisitResult(Type.DOUBLE_TYPE);
                     }
 
                     if (name.equalsIgnoreCase("variable") || name.equalsIgnoreCase("v")) {
                         final int entityLoadIndex = functionCompileState.entityParameterLoadIndex();
                         if (entityLoadIndex >= 0) {
+                            final Type previousExpectedType = expectedType;
                             expectedType = Type.DOUBLE_TYPE;
                             expression.right().visit(this);
+                            expectedType = previousExpectedType;
 
                             // dup2 the double value
                             mv.visitInsn(Opcodes.DUP2);
@@ -180,7 +187,8 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                             // Pop the boolean return value
                             mv.visitInsn(Opcodes.POP);
 
-                            return new CompileVisitResult(Type.DOUBLE_TYPE);
+                            expectedType = previousExpectedType;
+                            return finishDoubleResult();
                         }
                     }
                 }
@@ -288,9 +296,55 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                 mv.visitInsn(Opcodes.DDIV);
                 return new CompileVisitResult(Type.DOUBLE_TYPE);
             }
+            case NULL_COALESCE: {
+                expectedType = Type.DOUBLE_TYPE;
+                expression.left().visit(this);
+                expectedType = currentExpectedType;
+
+                mv.visitInsn(Opcodes.DUP2);
+                mv.visitInsn(Opcodes.DCONST_0);
+                mv.visitInsn(Opcodes.DCMPL);
+
+                Label falseLabel = new Label();
+                Label endLabel = new Label();
+                mv.visitJumpInsn(Opcodes.IFEQ, falseLabel);
+
+                finishDoubleResult();
+                mv.visitJumpInsn(Opcodes.GOTO, endLabel);
+
+                mv.visitLabel(falseLabel);
+                mv.visitInsn(Opcodes.POP2);
+                expectedType = Type.DOUBLE_TYPE;
+                expression.right().visit(this);
+                expectedType = currentExpectedType;
+                finishDoubleResult();
+
+                mv.visitLabel(endLabel);
+                return new CompileVisitResult(currentExpectedType != null ? currentExpectedType : Type.DOUBLE_TYPE);
+            }
+            case CONDITIONAL: {
+                expectedType = Type.BOOLEAN_TYPE;
+                expression.left().visit(this);
+                expectedType = currentExpectedType;
+
+                Label falseLabel = new Label();
+                Label endLabel = new Label();
+                mv.visitJumpInsn(Opcodes.IFEQ, falseLabel);
+
+                expectedType = Type.DOUBLE_TYPE;
+                expression.right().visit(this);
+                expectedType = currentExpectedType;
+                finishDoubleResult();
+                mv.visitJumpInsn(Opcodes.GOTO, endLabel);
+
+                mv.visitLabel(falseLabel);
+                mv.visitInsn(Opcodes.DCONST_0);
+                finishDoubleResult();
+
+                mv.visitLabel(endLabel);
+                return new CompileVisitResult(currentExpectedType != null ? currentExpectedType : Type.DOUBLE_TYPE);
+            }
             case ARROW:
-            case NULL_COALESCE:
-            case CONDITIONAL:
                 break;
         }
         return null;
@@ -492,6 +546,18 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
         return new CompileVisitResult(expectedType);
     }
 
+    private @NotNull CompileVisitResult finishDoubleResult() {
+        if (expectedType != null && expectedType.equals(Type.VOID_TYPE)) {
+            mv.visitInsn(Opcodes.POP2);
+            return new CompileVisitResult(Type.VOID_TYPE);
+        }
+        if (expectedType != null && !expectedType.equals(Type.DOUBLE_TYPE)) {
+            AsmUtil.addCast(mv, Type.DOUBLE_TYPE, expectedType);
+            return new CompileVisitResult(expectedType);
+        }
+        return new CompileVisitResult(Type.DOUBLE_TYPE);
+    }
+
     @Override
     public CompileVisitResult visitAccess(final @NotNull AccessExpression expression) {
         final Expression objectExpr = expression.object();
@@ -499,14 +565,14 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
 
         if (objectExpr instanceof IdentifierExpression) {
             final String name = ((IdentifierExpression) objectExpr).name();
-            if (name.equals("temp") || name.equals("t")) {
+            if (name.equalsIgnoreCase("temp") || name.equalsIgnoreCase("t")) {
                 final Integer localIndex = localsByName.get(property);
                 if (localIndex == null) {
                     mv.visitInsn(Opcodes.DCONST_0);
                 } else {
                     AsmUtil.addLoad(mv, localIndex, Type.DOUBLE_TYPE);
                 }
-                return new CompileVisitResult(Type.DOUBLE_TYPE);
+                return finishDoubleResult();
             }
 
             final int entityLoadIndex = functionCompileState.entityParameterLoadIndex();
@@ -531,7 +597,7 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                     mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
                             VALUE_TYPE.getInternalName(), "getAsNumber",
                             Type.getMethodDescriptor(Type.DOUBLE_TYPE), true);
-                    return new CompileVisitResult(Type.DOUBLE_TYPE);
+                    return finishDoubleResult();
                 }
 
                 // 对于任意非 variable/temp 的命名空间，尝试 @QueryBinding
@@ -546,7 +612,7 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                             Type.getInternalName(ownerClass),
                             queryMethod.getName(),
                             Type.getMethodDescriptor(Type.DOUBLE_TYPE), false);
-                    return new CompileVisitResult(Type.DOUBLE_TYPE);
+                    return finishDoubleResult();
                 }
 
                 // @QueryBinding 未命中 → 回退到 scope 查找
@@ -634,13 +700,13 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                 mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
                         VALUE_TYPE.getInternalName(), "getAsNumber",
                         Type.getMethodDescriptor(Type.DOUBLE_TYPE), true);
-                return new CompileVisitResult(Type.DOUBLE_TYPE);
+                return finishDoubleResult();
             }
         }
 
         // namespace/property not found in scope either → 0
         mv.visitInsn(Opcodes.DCONST_0);
-        return new CompileVisitResult(Type.DOUBLE_TYPE);
+        return finishDoubleResult();
     }
 
     @Override
@@ -683,9 +749,10 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
                 }
             }
             mv.visitInsn(Opcodes.DCONST_0);
-            return new CompileVisitResult(Type.DOUBLE_TYPE);
+            return finishDoubleResult();
         }
 
+        final Type callExpectedType = expectedType;
         final Function<?> function = (Function<?>) functionValue;
 
         if (function instanceof JavaFunction<?>) {
@@ -700,6 +767,20 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
             }
 
             final Object object = javaFunction.object();
+            final boolean isStatic = Modifier.isStatic(nativeMethod.getModifiers());
+
+            if (!isStatic) {
+                if (object == null) {
+                    throw new IllegalStateException("Non-static Java function has no receiver: " + nativeMethod);
+                }
+
+                final String fieldName = object.getClass().getSimpleName().toLowerCase() + Integer.toHexString(object.hashCode());
+                requirements.put(fieldName, object);
+
+                final String requirementDesc = Type.getDescriptor(object.getClass());
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitFieldInsn(Opcodes.GETFIELD, functionCompileState.className(), fieldName, requirementDesc);
+            }
 
             // load arguments
             final Iterator<Expression> it = arguments.iterator();
@@ -737,38 +818,37 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
 
                 expectedType = ctParameters[i];
                 it.next().visit(this);
+                expectedType = callExpectedType;
             }
+
+            expectedType = callExpectedType;
 
             final String nativeMethodOwner = Type.getInternalName(nativeMethod.getDeclaringClass());
             final Type ctReturnType = Type.getType(nativeMethod.getReturnType());
             final String nativeMethodDesc = Type.getMethodDescriptor(ctReturnType, ctParameters);
 
-            if (Modifier.isStatic(nativeMethod.getModifiers())) {
+            if (isStatic) {
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, nativeMethodOwner,
                         nativeMethod.getName(), nativeMethodDesc, false);
             } else {
-                final String fieldName = object.getClass().getSimpleName().toLowerCase() + Integer.toHexString(object.hashCode());
-                requirements.put(fieldName, object);
-
-                final String requirementDesc = Type.getDescriptor(object.getClass());
-
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitFieldInsn(Opcodes.GETFIELD, functionCompileState.className(), fieldName, requirementDesc);
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
                         nativeMethodOwner, nativeMethod.getName(), nativeMethodDesc, false);
             }
 
             if (nativeMethod.getReturnType() == void.class) {
-                if (!expectedType.equals(Type.VOID_TYPE)) {
-                    AsmUtil.addConstZero(mv, expectedType);
+                if (callExpectedType != null && !callExpectedType.equals(Type.VOID_TYPE)) {
+                    AsmUtil.addConstZero(mv, callExpectedType);
+                    return new CompileVisitResult(callExpectedType);
                 }
-            } else if (!nativeMethod.getReturnType().getName().equals(expectedType.getClassName())) {
-                AsmUtil.addCast(mv, ctReturnType, expectedType);
+                return new CompileVisitResult(Type.VOID_TYPE);
+            } else if (callExpectedType != null && !ctReturnType.equals(callExpectedType)) {
+                AsmUtil.addCast(mv, ctReturnType, callExpectedType);
+                return new CompileVisitResult(callExpectedType);
             }
+            return new CompileVisitResult(ctReturnType);
         } else {
             throw new UnsupportedOperationException("Not supporting non-Java functions yet");
         }
-        return null;
     }
 
     @Override
@@ -869,6 +949,9 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
 
     @Nullable
     private static Method findQueryMethodOnType(final Class<?> type, final String property, final String namespace) {
+        if (type == null) {
+            return null;
+        }
         for (final Method m : type.getMethods()) {
             final QueryBinding qb = m.getAnnotation(QueryBinding.class);
             if (qb != null && qb.value().equals(property)
@@ -899,6 +982,9 @@ final class MolangCompilingVisitor implements ExpressionVisitor<CompileVisitResu
 
     @Nullable
     private static Method findQueryCallMethodOnType(final Class<?> type, final String property, final String namespace) {
+        if (type == null) {
+            return null;
+        }
         for (final Method m : type.getMethods()) {
             final QueryBinding qb = m.getAnnotation(QueryBinding.class);
             if (qb != null && qb.value().equals(property)

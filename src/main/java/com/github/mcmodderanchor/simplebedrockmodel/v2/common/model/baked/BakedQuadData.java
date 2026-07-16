@@ -1,4 +1,4 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 public record BakedQuadData(
         float[] positions,

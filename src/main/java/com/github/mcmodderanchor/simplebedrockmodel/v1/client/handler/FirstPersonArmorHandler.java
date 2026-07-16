@@ -1,15 +1,10 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v1.client.handler;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.GeoArmorRenderer;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.IFPArmorHandRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.ItemStack;
@@ -18,8 +13,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderArmEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
-import org.jetbrains.annotations.NotNull;
-import org.joml.Matrix4f;
 
 /**
  * 通用的第一人称盔甲手臂渲染处理器。
@@ -49,36 +42,14 @@ public class FirstPersonArmorHandler {
 
         IClientItemExtensions ext = IClientItemExtensions.of(chestStack.getItem());
         var model = ext.getHumanoidArmorModel(player, chestStack, EquipmentSlot.CHEST, getDefaultModel());
-        if (!(model instanceof GeoArmorRenderer geoRenderer)) return;
+        if (!(model instanceof IFPArmorHandRenderer armorRenderer)) return;
 
-        BedrockBone armBone = arm == HumanoidArm.RIGHT
-                ? geoRenderer.getModel().getArmorRightArm()
-                : geoRenderer.getModel().getArmorLeftArm();
-        if (armBone == null) return;
-
-        RenderType renderType = geoRenderer.getRenderType(geoRenderer.getTexture());
-        VertexConsumer consumer = event.getMultiBufferSource().getBuffer(renderType);
-
-        PoseStack poseStack = event.getPoseStack();
-        poseStack.pushPose();
-
-        poseStack.mulPose(getGlobalTransform(armBone));
-
-        armBone.render(poseStack, consumer, event.getPackedLight(), OverlayTexture.NO_OVERLAY);
-
-        poseStack.popPose();
-    }
-
-    // 取得骨骼除了自身变换以外的全局变换矩阵
-    public static Matrix4f getGlobalTransform(@NotNull BedrockBone targetBone) {
-        Matrix4f matrix = new Matrix4f();
-
-        for (BedrockBone bone = targetBone.parent; bone != null; bone = bone.parent) {
-            matrix.scaleLocal(bone.xScale, bone.yScale, bone.zScale);
-            matrix.rotateLocal(bone.rotation);
-            matrix.translateLocal(bone.x / 16.0F, bone.y / 16.0F, bone.z / 16.0F);
-        }
-
-        return matrix;
+        armorRenderer.renderFirstPersonArmorArm(
+                player,
+                arm,
+                event.getPoseStack(),
+                event.getMultiBufferSource(),
+                event.getPackedLight()
+        );
     }
 }

@@ -21,7 +21,6 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.util.Map;
-import java.util.function.Consumer;
 
 @OnlyIn(Dist.CLIENT)
 final class AcceleratedRenderer {
@@ -34,63 +33,75 @@ final class AcceleratedRenderer {
             new Vector3f(-1.0f, -0.0f, -0.0f),
             new Vector3f(+1.0f, +0.0f, +0.0f)
     };
-    private final IAcceleratedRenderer<RenderContext> cachedMeshRenderer = this::renderCachedMesh;
 
-    boolean renderCubes(BedrockBone bone, AcceleratedBedrockBoneCache cache, PoseStack.Pose pose, VertexConsumer consumer,
+    private final IAcceleratedRenderer<BedrockBone> cachedCubeRenderer = this::renderCachedCubes;
+    private final IAcceleratedRenderer<BedrockBone> cachedMeshRenderer = this::renderCachedMeshes;
+
+    boolean renderCubes(BedrockBone bone, PoseStack.Pose pose, VertexConsumer consumer,
                         int lightmap, int overlay, float red, float green, float blue, float alpha) {
         if (bone.cubes.isEmpty()) {
             return false;
         }
-
-        IAcceleratedVertexConsumer extension = getExtension(consumer);
-        if (!canRender(extension)) {
-            return false;
-        }
-
-        int color = packColor(red, green, blue, alpha);
-        RenderContext context = new RenderContext(cache.cubeMeshes, builder -> {
-            for (BedrockCube cube : bone.cubes) {
-                cube.compile(IDENTITY_POSE, FIXED_NORMALS, builder, 0, overlay, 1.0f, 1.0f, 1.0f, 1.0f);
-            }
-        });
-        extension.doRender(cachedMeshRenderer, context, pose.pose(), pose.normal(), lightmap, overlay, color);
-        return true;
+        return render(bone, cachedCubeRenderer, consumer, pose, lightmap, overlay, red, green, blue, alpha);
     }
 
-    boolean renderMeshes(BedrockBone bone, AcceleratedBedrockBoneCache cache, PoseStack.Pose pose, VertexConsumer consumer,
+    boolean renderMeshes(BedrockBone bone, PoseStack.Pose pose, VertexConsumer consumer,
                          int lightmap, int overlay, float red, float green, float blue, float alpha) {
         if (bone.meshes.isEmpty()) {
             return false;
         }
+        return render(bone, cachedMeshRenderer, consumer, pose, lightmap, overlay, red, green, blue, alpha);
+    }
 
+    private boolean render(BedrockBone bone, IAcceleratedRenderer<BedrockBone> renderer,
+                           VertexConsumer consumer, PoseStack.Pose pose,
+                           int lightmap, int overlay, float red, float green, float blue, float alpha) {
         IAcceleratedVertexConsumer extension = getExtension(consumer);
         if (!canRender(extension)) {
             return false;
         }
 
-        int color = packColor(red, green, blue, alpha);
-        RenderContext context = new RenderContext(cache.polyMeshes, builder -> {
-            for (BedrockMesh mesh : bone.meshes) {
-                mesh.compileTriangles(IDENTITY_POSE, builder, 0, overlay, 1.0f, 1.0f, 1.0f, 1.0f);
-            }
-        });
-        extension.doRender(cachedMeshRenderer, context, pose.pose(), pose.normal(), lightmap, overlay, color);
+        extension.doRender(renderer, bone, pose.pose(), pose.normal(), lightmap, overlay, packColor(red, green, blue, alpha));
         return true;
     }
 
-    private void renderCachedMesh(VertexConsumer vertexConsumer, RenderContext context, Matrix4f transform, Matrix3f normal,
-                                  int lightmap, int overlay, int color) {
+    private void renderCachedCubes(VertexConsumer vertexConsumer, BedrockBone bone, Matrix4f transform, Matrix3f normal,
+                                   int lightmap, int overlay, int color) {
         IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
-        IMesh mesh = context.cache.get(extension);
+        Map<IBufferGraph, IMesh> meshCache = bone.getAcceleratedCache().cubeMeshes;
+        IMesh mesh = meshCache.get(extension);
 
         extension.beginTransform(transform, normal);
         if (mesh == null) {
             CulledMeshCollector collector = new CulledMeshCollector(extension);
             VertexConsumer builder = extension.decorate(collector);
-            context.meshEmitter.accept(builder);
+            for (BedrockCube cube : bone.cubes) {
+                cube.compile(IDENTITY_POSE, FIXED_NORMALS, builder, 0, overlay, 1.0f, 1.0f, 1.0f, 1.0f);
+            }
             collector.flush();
             mesh = AcceleratedEntityRenderingFeature.getMeshType().getBuilder().build(collector);
-            context.cache.put(extension, mesh);
+            meshCache.put(extension, mesh);
+        }
+        mesh.write(extension, color, lightmap, overlay);
+        extension.endTransform();
+    }
+
+    private void renderCachedMeshes(VertexConsumer vertexConsumer, BedrockBone bone, Matrix4f transform, Matrix3f normal,
+                                    int lightmap, int overlay, int color) {
+        IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
+        Map<IBufferGraph, IMesh> meshCache = bone.getAcceleratedCache().polyMeshes;
+        IMesh mesh = meshCache.get(extension);
+
+        extension.beginTransform(transform, normal);
+        if (mesh == null) {
+            CulledMeshCollector collector = new CulledMeshCollector(extension);
+            VertexConsumer builder = extension.decorate(collector);
+            for (BedrockMesh meshSource : bone.meshes) {
+                meshSource.compileTriangles(IDENTITY_POSE, builder, 0, overlay, 1.0f, 1.0f, 1.0f, 1.0f);
+            }
+            collector.flush();
+            mesh = AcceleratedEntityRenderingFeature.getMeshType().getBuilder().build(collector);
+            meshCache.put(extension, mesh);
         }
         mesh.write(extension, color, lightmap, overlay);
         extension.endTransform();
@@ -127,8 +138,5 @@ final class AcceleratedRenderer {
                 (int) (green * 255.0f),
                 (int) (blue * 255.0f)
         );
-    }
-
-    private record RenderContext(Map<IBufferGraph, IMesh> cache, Consumer<VertexConsumer> meshEmitter) {
     }
 }

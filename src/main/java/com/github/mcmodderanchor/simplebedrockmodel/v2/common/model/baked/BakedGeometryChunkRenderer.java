@@ -1,4 +1,4 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.acceleratedrendering.AcceleratedRenderingCompat;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium.SodiumCompat;

@@ -3,10 +3,10 @@ package example.client.render.entity;
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BakedBedrockModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BedrockModelInstance;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.BoneDefinition;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake.BakedGeometryChunk;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBoneDefinition;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import com.google.common.base.Suppliers;
@@ -38,7 +38,7 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
     private final Supplier<BakedBedrockModel> modelSupplier;
-    private final WeakHashMap<Zti, BedrockModelInstance> instanceCache = new WeakHashMap<>();
+    private final WeakHashMap<Zti, BakedModelInstance> instanceCache = new WeakHashMap<>();
 
     public ZtiRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -47,7 +47,7 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
     }
 
     private BakedBedrockModel loadModel() {
-        BakedBedrockModel model = BedrockModelResources.getInstance().getModel(KnownResources.ZTI_MODEL);
+        BakedBedrockModel model = BedrockModelResources.getInstance().getBakedModel(KnownResources.ZTI_MODEL);
         BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.ZTI_ANIMATION);
         if (model == null || animationFile == null) {
             return null;
@@ -73,7 +73,7 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
         if (model == null) {
             return;
         }
-        BedrockModelInstance instance = instanceCache.computeIfAbsent(entity, ignored -> model.createInstance());
+        BakedModelInstance instance = instanceCache.computeIfAbsent(entity, ignored -> model.createInstance());
         instance.resetPose();
 
         entity.getAnimationInstance().renderTick();
@@ -101,7 +101,7 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
 
     private static void logBoneHierarchy(BakedBedrockModel model) {
         SimpleBedrockModel.LOGGER.info("=== ZTI v2 bone hierarchy ({}) ===", model.bones().length);
-        for (BoneDefinition bone : model.bones()) {
+        for (BakedBoneDefinition bone : model.bones()) {
             boolean hasQuads = false;
             boolean hasVerts = false;
             for (BakedGeometryChunk chunk : model.cubeChunks()) {
@@ -139,7 +139,7 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
                 if (vy > maxY) maxY = vy;
                 if (vz > maxZ) maxZ = vz;
             }
-            BoneDefinition bone = model.bones()[chunk.attachBoneIndex()];
+            BakedBoneDefinition bone = model.bones()[chunk.attachBoneIndex()];
             SimpleBedrockModel.LOGGER.info(String.format(
                     "  Mesh chunk on bone [%d] %s: %d vertices, bounds=(%.3f,%.3f,%.3f) -> (%.3f,%.3f,%.3f)",
                     bone.index(), bone.name(), chunk.vertices().vertexCount(),

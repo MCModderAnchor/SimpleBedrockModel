@@ -1,9 +1,8 @@
-package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.bake;
+package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.*;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -28,7 +27,7 @@ public class BedrockModelBaker {
     public static BakedBedrockModel bake(BedrockModelPOJO pojo, BakerOptions options) {
         ModelSource source = modelSource(pojo);
         if (source.bones == null || source.bones.length == 0) {
-            return new BakedBedrockModel(new BoneDefinition[0], Map.of(), new BakedGeometryChunk[0],
+            return new BakedBedrockModel(new BakedBoneDefinition[0], Map.of(), new BakedGeometryChunk[0],
                     new BoneLocator[0], Map.of(), new QueryTransform[0], Map.of(), new ArrayPoseBuilder().toPose(), source.renderBoundingBox);
         }
 
@@ -37,20 +36,20 @@ public class BedrockModelBaker {
 
         Set<String> runtimeBoneNames = collectRuntimeBones(compileBones, options);
         RuntimeIndex runtimeIndex = createRuntimeIndex(source.bones, compileBones, runtimeBoneNames);
-        BoneDefinition[] boneDefinitions = createStaticBones(runtimeIndex);
+        BakedBoneDefinition[] bakedBoneDefinitions = createStaticBones(runtimeIndex);
 
-        Pose bindPose = createBindPose(boneDefinitions);
+        Pose bindPose = createBindPose(bakedBoneDefinitions);
         LocatorResult locatorResult = createLocators(source.bones, compileBones);
         QueryResult queryResult = createQueryTransforms(source.bones, compileBones, runtimeIndex);
         BedrockGeometryBaker.BakeResult bakeResult = BedrockGeometryBaker.bake(source.bones, compileBones, runtimeIndex, source.texWidth, source.texHeight, options);
 
-        boneDefinitions = applySubtreeGeometryFlags(boneDefinitions, bakeResult.chunks(), runtimeIndex);
+        bakedBoneDefinitions = applySubtreeGeometryFlags(bakedBoneDefinitions, bakeResult.chunks(), runtimeIndex);
 
         if (options.debugFoldedTree()) {
             SimpleBedrockModel.LOGGER.info("\n{}", describeFoldedTree(source.bones, compileBones, runtimeBoneNames, queryResult, options));
         }
 
-        return new BakedBedrockModel(boneDefinitions, runtimeIndex.indexByName, bakeResult.chunks(),
+        return new BakedBedrockModel(bakedBoneDefinitions, runtimeIndex.indexByName, bakeResult.chunks(),
                 locatorResult.locators, locatorResult.locatorByName, queryResult.queryTransforms, queryResult.queryTransformByName,
                 bindPose, source.renderBoundingBox);
     }
@@ -155,8 +154,8 @@ public class BedrockModelBaker {
         return new RuntimeIndex(runtimeBones, indexByName);
     }
 
-    private static BoneDefinition[] createStaticBones(RuntimeIndex runtimeIndex) {
-        BoneDefinition[] result = new BoneDefinition[runtimeIndex.bones.size()];
+    private static BakedBoneDefinition[] createStaticBones(RuntimeIndex runtimeIndex) {
+        BakedBoneDefinition[] result = new BakedBoneDefinition[runtimeIndex.bones.size()];
         ArrayList<List<Integer>> children = new ArrayList<>(runtimeIndex.bones.size());
         for (int i = 0; i < runtimeIndex.bones.size(); i++) children.add(new ArrayList<>());
         for (CompileBone bone : runtimeIndex.bones) {
@@ -168,14 +167,19 @@ public class BedrockModelBaker {
             Matrix4f bindLocalTransform = bindLocalTransformToRuntimeParent(bone, parentIndex, runtimeIndex);
             Matrix3f bindLocalNormalTransform = bindLocalTransform == null ? null : new Matrix3f(bindLocalTransform);
             int[] childArray = children.get(bone.runtimeIndex).stream().mapToInt(Integer::intValue).toArray();
-            result[bone.runtimeIndex] = new BoneDefinition(bone.name, bone.runtimeIndex, parentIndex, childArray,
-                    bone.pivotX, bone.pivotY, bone.pivotZ, bindLocalTransform, bindLocalNormalTransform,
-                    bone.bindRotation, bone.bindEulerRotation, 1, 1, 1, false, false);
+            float bindX = bindXToRuntimeParent(bone, parentIndex, runtimeIndex);
+            float bindY = bindYToRuntimeParent(bone, parentIndex, runtimeIndex);
+            float bindZ = bindZToRuntimeParent(bone, parentIndex, runtimeIndex);
+            Matrix4f foldedParentTransform = foldedParentTransform(bindLocalTransform, bindX, bindY, bindZ, bone);
+            Matrix3f foldedParentNormalTransform = foldedParentTransform == null ? null : new Matrix3f(foldedParentTransform);
+            result[bone.runtimeIndex] = new BakedBoneDefinition(bone.name, bone.runtimeIndex, parentIndex, childArray,
+                    bone.pivotX, bone.pivotY, bone.pivotZ, bindX, bindY, bindZ, bindLocalTransform, bindLocalNormalTransform,
+                    foldedParentTransform, foldedParentNormalTransform, bone.bindRotation, bone.bindEulerRotation, false, false);
         }
         return result;
     }
 
-    private static BoneDefinition[] applySubtreeGeometryFlags(BoneDefinition[] definitions, BakedGeometryChunk[] chunks, RuntimeIndex runtimeIndex) {
+    private static BakedBoneDefinition[] applySubtreeGeometryFlags(BakedBoneDefinition[] definitions, BakedGeometryChunk[] chunks, RuntimeIndex runtimeIndex) {
         boolean[] selfQuads = new boolean[definitions.length];
         boolean[] selfVertices = new boolean[definitions.length];
         for (BakedGeometryChunk chunk : chunks) {
@@ -192,18 +196,18 @@ public class BedrockModelBaker {
                 computeSubtreeGeometryFlags(definitions, i, selfQuads, selfVertices, hasQuadsInTree, hasVerticesInTree, visited);
             }
         }
-        BoneDefinition[] result = new BoneDefinition[definitions.length];
+        BakedBoneDefinition[] result = new BakedBoneDefinition[definitions.length];
         for (int i = 0; i < definitions.length; i++) {
-            BoneDefinition def = definitions[i];
-            result[i] = new BoneDefinition(def.name(), def.index(), def.parentIndex(), def.children(),
-                    def.pivotX(), def.pivotY(), def.pivotZ(), def.bindLocalTransform(), def.bindLocalNormalTransform(),
-                    def.bindRotation(), def.bindEulerRotation(), def.bindXScale(), def.bindYScale(), def.bindZScale(),
-                    hasQuadsInTree[i], hasVerticesInTree[i]);
+            BakedBoneDefinition def = definitions[i];
+            result[i] = new BakedBoneDefinition(def.name(), def.index(), def.parentIndex(), def.children(),
+                    def.pivotX(), def.pivotY(), def.pivotZ(), def.bindX(), def.bindY(), def.bindZ(),
+                    def.bindLocalTransform(), def.bindLocalNormalTransform(), def.foldedParentTransform(), def.foldedParentNormalTransform(),
+                    def.bindRotation(), def.bindEulerRotation(), hasQuadsInTree[i], hasVerticesInTree[i]);
         }
         return result;
     }
 
-    private static void computeSubtreeGeometryFlags(BoneDefinition[] definitions, int boneIndex,
+    private static void computeSubtreeGeometryFlags(BakedBoneDefinition[] definitions, int boneIndex,
                                                     boolean[] selfQuads, boolean[] selfVertices,
                                                     boolean[] hasQuadsInTree, boolean[] hasVerticesInTree,
                                                     boolean[] visited) {
@@ -229,6 +233,43 @@ public class BedrockModelBaker {
         return -1;
     }
 
+    private static float bindXToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
+        float parentPivotX = parentIndex < 0 ? 0.0f : runtimeIndex.bones.get(parentIndex).pivotX;
+        return (bone.pivotX - parentPivotX) * 16.0f;
+    }
+
+    private static float bindYToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
+        float parentPivotY = parentIndex < 0 ? 0.0f : runtimeIndex.bones.get(parentIndex).pivotY;
+        return (bone.pivotY - parentPivotY) * 16.0f;
+    }
+
+    private static float bindZToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
+        float parentPivotZ = parentIndex < 0 ? 0.0f : runtimeIndex.bones.get(parentIndex).pivotZ;
+        return (bone.pivotZ - parentPivotZ) * 16.0f;
+    }
+
+    @Nullable
+    private static Matrix4f foldedParentTransform(@Nullable Matrix4f bindLocalTransform, float bindX, float bindY, float bindZ, CompileBone bone) {
+        Matrix4f fullBind = bindLocalTransform == null ? new Matrix4f() : new Matrix4f(bindLocalTransform);
+        Matrix4f selfBind = createSelfBindTransform(bindX, bindY, bindZ, bone.pivotX, bone.pivotY, bone.pivotZ,
+                bone.bindRotation, 1, 1, 1);
+        Matrix4f foldedParent = fullBind.mul(selfBind.invert(new Matrix4f()), new Matrix4f());
+        return isIdentity(foldedParent) ? null : foldedParent;
+    }
+
+    private static Matrix4f createSelfBindTransform(float x, float y, float z, float pivotX, float pivotY, float pivotZ,
+                                                    Quaternionf rotation, float xScale, float yScale, float zScale) {
+        Matrix4f matrix = new Matrix4f();
+        if (x != 0 || y != 0 || z != 0) {
+            matrix.translate(x / 16.0F, y / 16.0F, z / 16.0F);
+        }
+        matrix.translate(pivotX, pivotY, pivotZ);
+        matrix.rotate(rotation);
+        matrix.scale(xScale, yScale, zScale);
+        matrix.translate(-pivotX, -pivotY, -pivotZ);
+        return matrix;
+    }
+
     @Nullable
     private static Matrix4f bindLocalTransformToRuntimeParent(CompileBone bone, int parentIndex, RuntimeIndex runtimeIndex) {
         Matrix4f sourceGlobal = globalBindMatrix(bone);
@@ -246,11 +287,12 @@ public class BedrockModelBaker {
         return matrix.equals(new Matrix4f(), 1.0E-6f);
     }
 
-    private static Pose createBindPose(BoneDefinition[] bones) {
+    private static Pose createBindPose(BakedBoneDefinition[] bones) {
         PoseBuilder poseBuilder = new ArrayPoseBuilder();
-        for (BoneDefinition bone : bones) {
-            poseBuilder.addBoneTransform(new BoneTransform(bone.index(), new Vector3f(),
-                    new BindRotationView(new Quaternionf(), new Vector3f()), new Vector3f(1, 1, 1)));
+        for (BakedBoneDefinition bone : bones) {
+            poseBuilder.addBoneTransform(new BoneTransform(bone.index(), new Vector3f(bone.bindX(), bone.bindY(), bone.bindZ()),
+                    new BindRotationView(bone.bindRotation(), bone.bindEulerRotation()),
+                    new Vector3f(1.0f, 1.0f, 1.0f)));
         }
         return poseBuilder.toPose();
     }

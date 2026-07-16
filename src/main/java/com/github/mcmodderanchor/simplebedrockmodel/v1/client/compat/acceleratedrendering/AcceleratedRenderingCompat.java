@@ -18,14 +18,14 @@ public final class AcceleratedRenderingCompat {
         return LOADED;
     }
 
-    public static boolean renderCubes(BedrockBone bone, AcceleratedBedrockBoneCache cache, PoseStack.Pose pose, VertexConsumer consumer,
+    public static boolean renderCubes(BedrockBone bone, PoseStack.Pose pose, VertexConsumer consumer,
                                       int lightmap, int overlay, float red, float green, float blue, float alpha) {
-        return LOADED && BackendHolder.RENDERED.renderCubes(bone, cache, pose, consumer, lightmap, overlay, red, green, blue, alpha);
+        return LOADED && BackendHolder.RENDERED.renderCubes(bone, pose, consumer, lightmap, overlay, red, green, blue, alpha);
     }
 
-    public static boolean renderMeshes(BedrockBone bone, AcceleratedBedrockBoneCache cache, PoseStack.Pose pose, VertexConsumer consumer,
+    public static boolean renderMeshes(BedrockBone bone, PoseStack.Pose pose, VertexConsumer consumer,
                                        int lightmap, int overlay, float red, float green, float blue, float alpha) {
-        return LOADED && BackendHolder.RENDERED.renderMeshes(bone, cache, pose, consumer, lightmap, overlay, red, green, blue, alpha);
+        return LOADED && BackendHolder.RENDERED.renderMeshes(bone, pose, consumer, lightmap, overlay, red, green, blue, alpha);
     }
 
     private static final class BackendHolder {
