@@ -3,6 +3,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockCube;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium.SodiumCompat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.util.FastColor;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -159,11 +160,17 @@ public final class TreeGeometryWriter {
         float x = position.x;
         float y = position.y;
         float z = position.z;
-        consumer.vertex(
+        int color = FastColor.ARGB32.color(
+                (int) (alpha * 255.0F),
+                (int) (red * 255.0F),
+                (int) (green * 255.0F),
+                (int) (blue * 255.0F)
+        );
+        consumer.addVertex(
                 poseMatrix.m00() * x + poseMatrix.m10() * y + poseMatrix.m20() * z + poseMatrix.m30(),
                 poseMatrix.m01() * x + poseMatrix.m11() * y + poseMatrix.m21() * z + poseMatrix.m31(),
                 poseMatrix.m02() * x + poseMatrix.m12() * y + poseMatrix.m22() * z + poseMatrix.m32(),
-                red, green, blue, alpha, u, v, overlay, light, CUBE_NORMAL.x, CUBE_NORMAL.y, CUBE_NORMAL.z
+                color, u, v, overlay, light, CUBE_NORMAL.x, CUBE_NORMAL.y, CUBE_NORMAL.z
         );
     }
 
@@ -182,11 +189,17 @@ public final class TreeGeometryWriter {
             ny *= invLength;
             nz *= invLength;
         }
-        consumer.vertex(
+        int color = FastColor.ARGB32.color(
+                (int) (alpha * 255.0F),
+                (int) (red * 255.0F),
+                (int) (green * 255.0F),
+                (int) (blue * 255.0F)
+        );
+        consumer.addVertex(
                 poseMatrix.m00() * x + poseMatrix.m10() * y + poseMatrix.m20() * z + poseMatrix.m30(),
                 poseMatrix.m01() * x + poseMatrix.m11() * y + poseMatrix.m21() * z + poseMatrix.m31(),
                 poseMatrix.m02() * x + poseMatrix.m12() * y + poseMatrix.m22() * z + poseMatrix.m32(),
-                red, green, blue, alpha, vertex.u(), vertex.v(), overlay, light, nx, ny, nz
+                color, vertex.u(), vertex.v(), overlay, light, nx, ny, nz
         );
     }
 }

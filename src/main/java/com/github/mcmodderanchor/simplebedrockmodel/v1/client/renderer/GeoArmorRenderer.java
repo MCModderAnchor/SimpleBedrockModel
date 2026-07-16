@@ -1,6 +1,5 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.handler.FirstPersonArmorHandler;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.model.BedrockArmorModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockBone;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -21,6 +20,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
 
 // 说是模型，实际上是一个适配器，用来敷衍原版的）
 public class GeoArmorRenderer extends HumanoidModel implements IFPArmorHandRenderer {
@@ -164,9 +164,19 @@ public class GeoArmorRenderer extends HumanoidModel implements IFPArmorHandRende
         VertexConsumer consumer = bufferSource.getBuffer(getRenderType(getTexture()));
 
         poseStack.pushPose();
-        poseStack.mulPoseMatrix(FirstPersonArmorHandler.getGlobalTransform(armBone));
+        poseStack.mulPose(getGlobalTransform(armBone));
         armBone.render(poseStack, consumer, packedLight, OverlayTexture.NO_OVERLAY);
         poseStack.popPose();
+    }
+
+    private static Matrix4f getGlobalTransform(@NotNull BedrockBone targetBone) {
+        Matrix4f matrix = new Matrix4f();
+        for (BedrockBone bone = targetBone.parent; bone != null; bone = bone.parent) {
+            matrix.scaleLocal(bone.xScale, bone.yScale, bone.zScale);
+            matrix.rotateLocal(bone.rotation);
+            matrix.translateLocal(bone.x / 16.0F, bone.y / 16.0F, bone.z / 16.0F);
+        }
+        return matrix;
     }
 
     public RenderType getRenderType(ResourceLocation texture) {

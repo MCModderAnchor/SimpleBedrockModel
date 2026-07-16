@@ -79,22 +79,25 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
     }
 
     @Override
-    public void renderToBuffer(PoseStack poseStack, @NotNull VertexConsumer buffer, int light, int overlay,
-                               float r, float g, float b, float a) {
+    public void renderToBuffer(PoseStack poseStack, @NotNull VertexConsumer buffer, int light, int overlay, int color) {
         Minecraft mc = Minecraft.getInstance();
         MultiBufferSource bufferSource = mc.renderBuffers().bufferSource();
 
-        float partialTick = mc.getFrameTime();
+        float partialTick = mc.getTimer().getGameTimeDeltaPartialTick(true);
+        float red = net.minecraft.util.FastColor.ARGB32.red(color) / 255.0F;
+        float green = net.minecraft.util.FastColor.ARGB32.green(color) / 255.0F;
+        float blue = net.minecraft.util.FastColor.ARGB32.blue(color) / 255.0F;
+        float alpha = net.minecraft.util.FastColor.ARGB32.alpha(color) / 255.0F;
 
         poseStack.pushPose();
         if (this.livingEntity != null && this.equipmentSlot != null && this.original != null) {
             scaleModelForBaby(poseStack, this.livingEntity, partialTick, this.equipmentSlot, this.original);
         }
 
-        this.instance.renderToBuffer(poseStack, bufferSource, getRenderType(this.texture), BedrockModelRenderTypes.polyMeshCutout(this.texture), light, overlay, r, g, b, a);
+        this.instance.renderToBuffer(poseStack, bufferSource, getRenderType(this.texture), BedrockModelRenderTypes.polyMeshCutout(this.texture), light, overlay, red, green, blue, alpha);
         poseStack.popPose();
 
-        afterRender(poseStack, buffer, light, overlay, r, g, b, a);
+        afterRender(poseStack, buffer, light, overlay, red, green, blue, alpha);
     }
 
     public void afterRender(PoseStack poseStack, VertexConsumer buffer, int light, int overlay,
@@ -119,13 +122,13 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
         VertexConsumer consumer = bufferSource.getBuffer(renderType);
 
         poseStack.pushPose();
-        poseStack.mulPoseMatrix(this.instance.getGlobalTransform(armBone.parentIndex()));
+        poseStack.mulPose(this.instance.getGlobalTransform(armBone.parentIndex()));
         this.model.renderBone(this.instance, armBone.index(), poseStack, consumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F, true);
         poseStack.popPose();
 
         VertexConsumer triangleConsumer = bufferSource.getBuffer(BedrockModelRenderTypes.polyMeshCutout(getTexture()));
         poseStack.pushPose();
-        poseStack.mulPoseMatrix(this.instance.getGlobalTransform(armBone.parentIndex()));
+        poseStack.mulPose(this.instance.getGlobalTransform(armBone.parentIndex()));
         this.model.renderBone(this.instance, armBone.index(), poseStack, triangleConsumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F, false);
         poseStack.popPose();
     }

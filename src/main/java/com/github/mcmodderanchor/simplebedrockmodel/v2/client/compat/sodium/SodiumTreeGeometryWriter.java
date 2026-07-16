@@ -1,16 +1,16 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.BedrockCube;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.ISodiumVertexWriter;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.ISodiumVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.CubeBox;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.CubePerFace;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.ICube;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.PolyMesh;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import me.jellysquid.mods.sodium.client.render.vertex.VertexConsumerUtils;
 import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.ModelVertex;
+import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
+import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -182,7 +182,7 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
         float x = vx(vertexIndex);
         float y = vy(vertexIndex);
         float z = vz(vertexIndex);
-        ModelVertex.write(ptr,
+        EntityVertex.write(ptr,
                 pose.m00() * x + pose.m10() * y + pose.m20() * z + pose.m30(),
                 pose.m01() * x + pose.m11() * y + pose.m21() * z + pose.m31(),
                 pose.m02() * x + pose.m12() * y + pose.m22() * z + pose.m32(),
@@ -204,7 +204,7 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
             ny *= invLength;
             nz *= invLength;
         }
-        ModelVertex.write(ptr,
+        EntityVertex.write(ptr,
                 pose.m00() * x + pose.m10() * y + pose.m20() * z + pose.m30(),
                 pose.m01() * x + pose.m11() * y + pose.m21() * z + pose.m31(),
                 pose.m02() * x + pose.m12() * y + pose.m22() * z + pose.m32(),
@@ -241,7 +241,7 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
     @Override
     public void flush(VertexBufferWriter writer, int vertexCount) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            writer.push(stack, SCRATCH, vertexCount, ModelVertex.FORMAT);
+            writer.push(stack, SCRATCH, vertexCount, EntityVertex.FORMAT);
         }
     }
 }

@@ -52,7 +52,7 @@ public class ExampleArmorItem extends ArmorItem {
                         TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(InnerResourceLoader.DEFENDER);
                         this.renderer = new GeoArmorRendererV2(
                                 model,
-                                item.get().getEquipmentSlot(),
+                                item.getEquipmentSlot(),
                                 ResourceLocation.fromNamespaceAndPath("example", "textures/armor/defender.png")
                         );
                     }
