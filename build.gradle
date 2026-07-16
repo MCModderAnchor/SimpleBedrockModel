@@ -103,6 +103,7 @@ dependencies {
     implementation "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge"
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
     mcLib jarJar("com.maydaymemory:mae:1.1.4") {
+        exclude group: 'com.google.code.gson', module: 'gson'
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
         exclude group: 'it.unimi.dsi', module: 'fastutil'
         exclude group: 'org.joml', module: 'joml'
