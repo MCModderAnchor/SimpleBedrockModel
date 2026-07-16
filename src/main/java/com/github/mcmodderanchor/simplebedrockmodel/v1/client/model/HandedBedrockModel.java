@@ -17,6 +17,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 /**
  * 带有双臂渲染的基岩模型，用于第一人称视角下的武器等物品的渲染。
  */
+@Deprecated
 public class HandedBedrockModel extends BedrockModelBase {
     private boolean renderHand = true;
     private final BedrockBone leftHandBone;

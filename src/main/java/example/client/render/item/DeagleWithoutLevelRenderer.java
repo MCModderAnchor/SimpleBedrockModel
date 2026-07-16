@@ -35,6 +35,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
@@ -203,7 +204,7 @@ public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockM
     }
 
     @Override
-    public void updateParticleEmitterTransforms(FirstPersonParticleSystem system, PoseStack poseStack) {
+    public void updateParticleEmitterTransforms(FirstPersonParticleSystem system, PoseStack poseStack, InteractionHand hand) {
         Minecraft mc = Minecraft.getInstance();
         DeagleAnimationGraph deagleGraph = null;
 
@@ -226,7 +227,7 @@ public class DeagleWithoutLevelRenderer extends AbstractGeoItemRenderer<BedrockM
             for (ParticleEffectData data : pendingParticles) {
                 ParticleEffectDefinition def = ParticleDefinitionLoader.getInstance().getDefinition(data.effect());
                 if (def != null) {
-                    ParticleEmitterInstance emitter = system.addEmitter(def);
+                    ParticleEmitterInstance emitter = system.addEmitter(def, hand);
                     String locator = data.locator();
                     if (locator != null && !locator.isEmpty()) {
                         EMITTER_LOCATOR_MAP.put(emitter, locator);

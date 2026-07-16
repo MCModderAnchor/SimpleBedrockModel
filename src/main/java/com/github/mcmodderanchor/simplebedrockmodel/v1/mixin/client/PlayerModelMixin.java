@@ -4,6 +4,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.handler.FirstPerso
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Final;
@@ -35,8 +36,11 @@ public class PlayerModelMixin<T extends LivingEntity> extends HumanoidModel<T> {
 
         // 用于清除默认的手臂旋转
         // 当第一人称渲染是，ageInTicks 正好是 0
-        var instance = FirstPersonRenderHandler.getActiveAnimationInstance();
-        if (ageInTicks == 0F && instance != null && instance.shouldRenderHand()) {
+        var instance = FirstPersonRenderHandler.getActiveAnimationInstance(InteractionHand.MAIN_HAND);
+        var instance2 = FirstPersonRenderHandler.getActiveAnimationInstance(InteractionHand.OFF_HAND);
+        boolean rl = instance != null && instance.shouldRenderHand();
+        boolean rl2 = instance2 != null && instance2.shouldRenderHand();
+        if (ageInTicks == 0F && (rl || rl2)) {
             sbm$resetAll(this.rightArm);
             sbm$resetAll(this.leftArm);
             this.rightSleeve.copyFrom(this.rightArm);
@@ -49,8 +53,6 @@ public class PlayerModelMixin<T extends LivingEntity> extends HumanoidModel<T> {
      */
     @Unique
     private void sbm$resetAll(ModelPart part) {
-        part.xRot = 0.0F;
-        part.yRot = 0.0F;
-        part.zRot = 0.0F;
+        part.resetPose();
     }
 }

@@ -73,6 +73,10 @@ public final class RenderHelper {
         GL11.glDisable(GL11.GL_STENCIL_TEST);
     }
 
+    /**
+     * @deprecated 第一人称渲染时，优先使用传入hand buffer的版本{@link #renderFirstPersonArm(LocalPlayer, MultiBufferSource, HumanoidArm, PoseStack, int)}，否则可能有兼容性问题
+     */
+    @Deprecated
     public static void renderFirstPersonArm(LocalPlayer player, HumanoidArm hand, PoseStack matrixStack, int combinedLight) {
         Minecraft mc = Minecraft.getInstance();
         EntityRenderDispatcher renderManager = mc.getEntityRenderDispatcher();
@@ -83,6 +87,18 @@ public final class RenderHelper {
             renderer.renderRightHand(matrixStack, buffer, combinedLight, player);
         } else {
             renderer.renderLeftHand(matrixStack, buffer, combinedLight, player);
+        }
+    }
+
+    public static void renderFirstPersonArm(LocalPlayer player, MultiBufferSource bufferSource, HumanoidArm hand, PoseStack matrixStack, int combinedLight) {
+        Minecraft mc = Minecraft.getInstance();
+        EntityRenderDispatcher renderManager = mc.getEntityRenderDispatcher();
+        PlayerRenderer renderer = (PlayerRenderer) renderManager.getRenderer(player);
+
+        if (hand == HumanoidArm.RIGHT) {
+            renderer.renderRightHand(matrixStack, bufferSource, combinedLight, player);
+        } else {
+            renderer.renderLeftHand(matrixStack, bufferSource, combinedLight, player);
         }
     }
 

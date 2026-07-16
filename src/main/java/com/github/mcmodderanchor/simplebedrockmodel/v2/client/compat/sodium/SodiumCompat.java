@@ -17,6 +17,15 @@ public final class SodiumCompat {
 
     public static boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
                                      float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
+        return writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, false);
+    }
+
+    public static boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
+                                     float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal,
+                                     boolean skipNormalVisibilityCull) {
+        if (WRITER instanceof SodiumBakedChunkWriter sodiumWriter) {
+            return sodiumWriter.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
+        }
         return WRITER.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
     }
 
@@ -27,8 +36,14 @@ public final class SodiumCompat {
 
     public static boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay,
                                      float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
+        return writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, false);
+    }
+
+    public static boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay,
+                                     float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal,
+                                     boolean skipNormalVisibilityCull) {
         return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()
-                && TREE_WRITER.writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+                && TREE_WRITER.writeCubes(cubes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
     }
 
     public static boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, int lightmap, int overlay,
