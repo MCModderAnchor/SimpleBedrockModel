@@ -22,6 +22,9 @@ public class BedrockAnimationPOJO {
     @SerializedName("particle_effects")
     private ParticleEffectKeyframes particleEffects;
 
+    @SerializedName("timeline")
+    private TimelineKeyframes timeline;
+
     public boolean isLoop() {
         return loop;
     }
@@ -40,5 +43,9 @@ public class BedrockAnimationPOJO {
 
     public ParticleEffectKeyframes getParticleEffects() {
         return particleEffects;
+    }
+
+    public TimelineKeyframes getTimeline() {
+        return timeline;
     }
 }
