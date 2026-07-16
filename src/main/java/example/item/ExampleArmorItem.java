@@ -63,4 +63,5 @@ public class ExampleArmorItem extends ArmorItem {
             }, item);
         }
     }
+
 }

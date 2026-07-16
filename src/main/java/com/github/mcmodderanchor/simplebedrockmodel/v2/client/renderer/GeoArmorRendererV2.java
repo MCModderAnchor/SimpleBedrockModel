@@ -1,7 +1,8 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.renderer;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.IFPArmorHandRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.ICustomArmorRenderer;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.IFPArmorHandRenderer;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneState;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeArmorModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
@@ -15,6 +16,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FastColor;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
@@ -22,7 +24,10 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements IFPArmorHandRenderer {
+/**
+ * 基于 Tree 模型的实例盔甲渲染器。
+ */
+public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements IFPArmorHandRenderer, ICustomArmorRenderer {
     protected final TreeBedrockModel model;
     protected final TreeArmorModelInstance instance;
     private final EquipmentSlot armorSlot;
@@ -51,7 +56,6 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
 
     public void preparePose(LivingEntity livingEntity, ItemStack itemStack, EquipmentSlot equipmentSlot, HumanoidModel<?> original) {
         this.instance.preparePose(livingEntity, itemStack, equipmentSlot, original);
-
         this.livingEntity = livingEntity;
         this.itemStack = itemStack;
         this.equipmentSlot = equipmentSlot;
@@ -69,7 +73,6 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
                 float headScale = 1.5f / original.babyHeadScale;
                 poseStack.scale(headScale, headScale, headScale);
             }
-
             poseStack.translate(0, original.babyYHeadOffset / 16f, original.babyZHeadOffset / 16f);
         } else {
             float bodyScale = 1 / original.babyBodyScale;
@@ -80,28 +83,40 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
 
     @Override
     public void renderToBuffer(PoseStack poseStack, @NotNull VertexConsumer buffer, int light, int overlay, int color) {
-        Minecraft mc = Minecraft.getInstance();
-        MultiBufferSource bufferSource = mc.renderBuffers().bufferSource();
+        float red = FastColor.ARGB32.red(color) / 255.0F;
+        float green = FastColor.ARGB32.green(color) / 255.0F;
+        float blue = FastColor.ARGB32.blue(color) / 255.0F;
+        float alpha = FastColor.ARGB32.alpha(color) / 255.0F;
+        renderArmorToBuffer(poseStack, Minecraft.getInstance().renderBuffers().bufferSource(), light, overlay, red, green, blue, alpha);
+        afterRender(poseStack, buffer, light, overlay, red, green, blue, alpha);
+    }
 
-        float partialTick = mc.getTimer().getGameTimeDeltaPartialTick(true);
-        float red = net.minecraft.util.FastColor.ARGB32.red(color) / 255.0F;
-        float green = net.minecraft.util.FastColor.ARGB32.green(color) / 255.0F;
-        float blue = net.minecraft.util.FastColor.ARGB32.blue(color) / 255.0F;
-        float alpha = net.minecraft.util.FastColor.ARGB32.alpha(color) / 255.0F;
+    @Override
+    public void renderArmorToBuffer(PoseStack poseStack, MultiBufferSource bufferSource, int light, int overlay,
+                                    float red, float green, float blue, float alpha) {
+        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
 
         poseStack.pushPose();
         if (this.livingEntity != null && this.equipmentSlot != null && this.original != null) {
             scaleModelForBaby(poseStack, this.livingEntity, partialTick, this.equipmentSlot, this.original);
         }
-
-        this.instance.renderToBuffer(poseStack, bufferSource, getRenderType(this.texture), BedrockModelRenderTypes.polyMeshCutout(this.texture), light, overlay, red, green, blue, alpha);
+        this.instance.renderToBuffer(
+                poseStack,
+                bufferSource,
+                getRenderType(this.texture),
+                BedrockModelRenderTypes.polyMeshCutout(this.texture),
+                light,
+                overlay,
+                red,
+                green,
+                blue,
+                alpha
+        );
         poseStack.popPose();
-
-        afterRender(poseStack, buffer, light, overlay, red, green, blue, alpha);
     }
 
     public void afterRender(PoseStack poseStack, VertexConsumer buffer, int light, int overlay,
-                            float r, float g, float b, float a) {
+                            float red, float green, float blue, float alpha) {
         this.livingEntity = null;
         this.itemStack = null;
         this.equipmentSlot = null;
@@ -123,13 +138,15 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
 
         poseStack.pushPose();
         poseStack.mulPose(this.instance.getGlobalTransform(armBone.parentIndex()));
-        this.model.renderBone(this.instance, armBone.index(), poseStack, consumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F, true, true);
+        this.model.renderBone(this.instance, armBone.index(), poseStack, consumer, packedLight, OverlayTexture.NO_OVERLAY,
+                1.0F, 1.0F, 1.0F, 1.0F, true, true);
         poseStack.popPose();
 
         VertexConsumer triangleConsumer = bufferSource.getBuffer(BedrockModelRenderTypes.polyMeshCutout(getTexture()));
         poseStack.pushPose();
         poseStack.mulPose(this.instance.getGlobalTransform(armBone.parentIndex()));
-        this.model.renderBone(this.instance, armBone.index(), poseStack, triangleConsumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F, false, true);
+        this.model.renderBone(this.instance, armBone.index(), poseStack, triangleConsumer, packedLight, OverlayTexture.NO_OVERLAY,
+                1.0F, 1.0F, 1.0F, 1.0F, false, true);
         poseStack.popPose();
     }
 

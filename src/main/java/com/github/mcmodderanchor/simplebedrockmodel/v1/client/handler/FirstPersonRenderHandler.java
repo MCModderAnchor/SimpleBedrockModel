@@ -292,16 +292,33 @@ public class FirstPersonRenderHandler {
         PARTICLE_SYSTEM.tick(dt);
 
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(true);
-        tickHandAnimation(MAIN_STATE, partialTick);
-        tickHandAnimation(OFF_STATE, partialTick);
+        tickHandAnimation(MAIN_STATE, InteractionHand.MAIN_HAND, partialTick);
+        tickHandAnimation(OFF_STATE, InteractionHand.OFF_HAND, partialTick);
     }
 
-    private static void tickHandAnimation(HandRenderState state, float partialTick) {
+    private static void tickHandAnimation(HandRenderState state, InteractionHand hand, float partialTick) {
         IFPAnimationInstance ani = state.transitioning ? state.previousInstance : state.activeInstance;
-        if (ani != null) {
-            ani.triggerDraw();
-            ani.tick(partialTick);
+        if (ani == null || !canActuallyRenderInHand(ani, hand)) {
+            return;
         }
+
+        ani.triggerDraw();
+        ani.tick(partialTick);
+    }
+
+    private static boolean canActuallyRenderInHand(IFPAnimationInstance ani, InteractionHand hand) {
+        if (hand == InteractionHand.OFF_HAND && mainHandBlocksOffhand()) {
+            return false;
+        }
+
+        ItemStack stack = ani.currentItem();
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        return getRenderer(stack)
+                .map(renderer -> renderer.canRenderInHand(stack, hand))
+                .orElse(false);
     }
 
     @SubscribeEvent
