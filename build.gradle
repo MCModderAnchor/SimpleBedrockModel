@@ -102,19 +102,20 @@ repositories {
 dependencies {
     implementation "maven.modrinth:sodium:mc1.21-0.6.0-beta.2-neoforge"
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
-    mcLib jarJar("com.maydaymemory:mae:1.1.3") {
+    mcLib jarJar("com.maydaymemory:mae:1.1.4") {
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
         exclude group: 'it.unimi.dsi', module: 'fastutil'
         exclude group: 'org.joml', module: 'joml'
     }
 
-    implementation "maven.modrinth:acceleratedrendering:1.0.9-1.21.1-alpha"
+    implementation "curse.maven:accelerated-rendering-1314021:8437381"
     api 'org.ow2.asm:asm:9.8'
     runtimeOnly "curse.maven:configured-457570:7276577"
 
-    // 测试用mod
+    // 测试用兼容模组：发布时仍保持可选依赖。
     compileOnly "curse.maven:epic-fight-mod-405076:7734081"
-    runtimeOnly "curse.maven:playeranimator-658587:7389814"
+    localRuntime "curse.maven:epic-fight-mod-405076:7734081"
+    localRuntime "curse.maven:playeranimator-658587:7389814"
 
     // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
