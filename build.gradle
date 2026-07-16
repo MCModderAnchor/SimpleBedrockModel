@@ -100,7 +100,7 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:sodium:mc1.21-0.6.0-beta.2-neoforge"
+    implementation "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge"
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
     mcLib jarJar("com.maydaymemory:mae:1.1.4") {
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
@@ -114,9 +114,9 @@ dependencies {
 
     // 测试用兼容模组：发布时仍保持可选依赖。
     compileOnly "curse.maven:epic-fight-mod-405076:7734081"
-    localRuntime "curse.maven:epic-fight-mod-405076:7734081"
+//    localRuntime "curse.maven:epic-fight-mod-405076:7734081"
     localRuntime "curse.maven:playeranimator-658587:7389814"
-
+    localRuntime "maven.modrinth:iris:1.8.12+1.21.1-neoforge"
 
     // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
