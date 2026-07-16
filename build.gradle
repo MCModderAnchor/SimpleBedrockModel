@@ -115,6 +115,7 @@ dependencies {
     compileOnly fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1")
     jarJar minecraftLibrary("com.maydaymemory:mae:1.1.4") {
         jarJar.ranged(it, "[1.1.4,)")
+        exclude group: 'com.google.code.gson', module: 'gson'
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
         exclude group: 'it.unimi.dsi', module: 'fastutil'
         exclude group: 'org.joml', module: 'joml'
