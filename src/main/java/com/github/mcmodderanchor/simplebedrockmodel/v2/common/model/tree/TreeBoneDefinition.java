@@ -2,6 +2,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.acceleratedrendering.AcceleratedBedrockGeometryCache;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.LocalCubeBounds;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneDefinition;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -30,6 +31,8 @@ public final class TreeBoneDefinition implements BoneDefinition {
     private final Vector3f bindEulerRotation;
     private final Map<String, LocatorData> locators;
     private final ICube[] cubes;
+    @Nullable
+    private final LocalCubeBounds ownCubeBounds;
     private final PolyMesh[] polyMeshes;
     private final boolean hasQuadsInTree;
     private final boolean hasVerticesInTree;
@@ -42,6 +45,16 @@ public final class TreeBoneDefinition implements BoneDefinition {
                               float bindX, float bindY, float bindZ,
                               Quaternionf bindRotation, Vector3f bindEulerRotation,
                               Map<String, LocatorData> locators, ICube[] cubes, PolyMesh[] polyMeshes,
+                              boolean hasQuadsInTree, boolean hasVerticesInTree) {
+        this(name, index, parentIndex, children, pivotX, pivotY, pivotZ, bindX, bindY, bindZ,
+                bindRotation, bindEulerRotation, locators, cubes, null, polyMeshes, hasQuadsInTree, hasVerticesInTree);
+    }
+
+    public TreeBoneDefinition(String name, int index, int parentIndex, int[] children,
+                              float pivotX, float pivotY, float pivotZ,
+                              float bindX, float bindY, float bindZ,
+                              Quaternionf bindRotation, Vector3f bindEulerRotation,
+                              Map<String, LocatorData> locators, ICube[] cubes, @Nullable LocalCubeBounds ownCubeBounds, PolyMesh[] polyMeshes,
                               boolean hasQuadsInTree, boolean hasVerticesInTree) {
         this.name = name;
         this.index = index;
@@ -58,6 +71,7 @@ public final class TreeBoneDefinition implements BoneDefinition {
         this.bindEulerRotation = new Vector3f(bindEulerRotation);
         this.locators = Map.copyOf(locators);
         this.cubes = cubes;
+        this.ownCubeBounds = ownCubeBounds;
         this.polyMeshes = polyMeshes;
         this.hasQuadsInTree = hasQuadsInTree;
         this.hasVerticesInTree = hasVerticesInTree;
@@ -138,6 +152,11 @@ public final class TreeBoneDefinition implements BoneDefinition {
 
     public ICube[] cubes() {
         return cubes;
+    }
+
+    @Nullable
+    public LocalCubeBounds ownCubeBounds() {
+        return ownCubeBounds;
     }
 
     public PolyMesh[] polyMeshes() {

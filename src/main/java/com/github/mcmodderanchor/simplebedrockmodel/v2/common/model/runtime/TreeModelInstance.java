@@ -1,7 +1,9 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.ICube;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBoneDefinition;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -64,6 +66,40 @@ public class TreeModelInstance extends BoneTreeInstance {
     @Override
     public int getIndex(String boneName) {
         return baseModel.getIndex(boneName);
+    }
+
+    @Override
+    protected void rayTraceCubes(ModelRayTracer tracer) {
+        for (TreeBoneDefinition definition : baseModel.bones()) {
+            if (definition.ownCubeBounds() == null) {
+                continue;
+            }
+            BoneState bone = getBone(definition.index());
+            if (bone == null || !bone.visible) {
+                continue;
+            }
+            Matrix4f boneTransform = getGlobalTransform(definition.index());
+            if (!tracer.traceGroup(definition.ownCubeBounds(), boneTransform)) {
+                continue;
+            }
+            ICube[] cubes = definition.cubes();
+            for (int cubeIndex = 0; cubeIndex < cubes.length; cubeIndex++) {
+                ICube cube = cubes[cubeIndex];
+                tracer.traceCube(definition.index(), cubeIndex, cube.x(), cube.y(), cube.z(), cube.width(), cube.height(), cube.depth(),
+                        boneTransform, cubeLocalTransform(cube));
+            }
+        }
+    }
+
+    private static Matrix4f cubeLocalTransform(ICube cube) {
+        Matrix4f transform = new Matrix4f();
+        if (cube.hasRotation()) {
+            float[] pivot = cube.pivot();
+            transform.translate(pivot[0], pivot[1], pivot[2]);
+            transform.rotate(cube.rotation());
+            transform.translate(-pivot[0], -pivot[1], -pivot[2]);
+        }
+        return transform;
     }
 
     @Nullable

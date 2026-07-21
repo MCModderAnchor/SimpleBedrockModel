@@ -2,6 +2,8 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedCube;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedCubeGeometry;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BoneLocator;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.QueryTransform;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -68,6 +70,38 @@ public class BakedModelInstance extends BoneTreeInstance {
     @Override
     public int getIndex(String boneName) {
         return baseModel.getIndex(boneName);
+    }
+
+    @Override
+    protected void rayTraceCubes(ModelRayTracer tracer) {
+        if (!baseModel.retainsCubeGeometry()) {
+            return;
+        }
+        for (BakedCubeGeometry geometry : baseModel.cubeGeometry()) {
+            if (geometry.bounds() == null) {
+                continue;
+            }
+            int attachmentBoneIndex = geometry.attachBoneIndex();
+            Matrix4f attachmentTransform;
+            if (attachmentBoneIndex < 0) {
+                attachmentTransform = new Matrix4f();
+            } else {
+                BoneState bone = getBone(attachmentBoneIndex);
+                if (bone == null || !bone.visible) {
+                    continue;
+                }
+                attachmentTransform = getGlobalTransform(attachmentBoneIndex);
+            }
+            if (!tracer.traceGroup(geometry.bounds(), attachmentTransform)) {
+                continue;
+            }
+            BakedCube[] cubes = geometry.cubes();
+            for (int cubeIndex = 0; cubeIndex < cubes.length; cubeIndex++) {
+                BakedCube cube = cubes[cubeIndex];
+                tracer.traceCube(attachmentBoneIndex, cubeIndex, cube.x(), cube.y(), cube.z(), cube.width(), cube.height(), cube.depth(),
+                        attachmentTransform, cube.localTransform());
+            }
+        }
     }
 
     @Nullable
