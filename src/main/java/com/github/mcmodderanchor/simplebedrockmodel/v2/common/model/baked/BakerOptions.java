@@ -15,7 +15,8 @@ public record BakerOptions(
         Set<String> preservedBones,
         Set<Pattern> preservedBonePatterns,
         boolean bakeStaticGeometry,
-        boolean debugFoldedTree
+        boolean debugFoldedTree,
+        boolean retainCubeGeometry
 ) {
     public static final Set<String> ARMOR_BONES = Set.of(
             "armorHead",
@@ -35,16 +36,21 @@ public record BakerOptions(
         preservedBonePatterns = Set.copyOf(preservedBonePatterns);
     }
 
+    public BakerOptions(Set<String> animatedBones, Set<String> preservedBones, Set<Pattern> preservedBonePatterns,
+                        boolean bakeStaticGeometry, boolean debugFoldedTree) {
+        this(animatedBones, preservedBones, preservedBonePatterns, bakeStaticGeometry, debugFoldedTree, false);
+    }
+
     public BakerOptions(Set<String> animatedBones, Set<String> preservedBones, boolean bakeStaticGeometry, boolean debugFoldedTree) {
-        this(animatedBones, preservedBones, Set.of(), bakeStaticGeometry, debugFoldedTree);
+        this(animatedBones, preservedBones, Set.of(), bakeStaticGeometry, debugFoldedTree, false);
     }
 
     public static BakerOptions defaults() {
-        return new BakerOptions(Set.of(), Set.of(), Set.of(), true, false);
+        return new BakerOptions(Set.of(), Set.of(), Set.of(), true, false, false);
     }
 
     public static BakerOptions ofAnimatedBones(Set<String> animatedBones) {
-        return new BakerOptions(animatedBones, Set.of(), Set.of(), true, false);
+        return new BakerOptions(animatedBones, Set.of(), Set.of(), true, false, false);
     }
 
     public static BakerOptions ofAnimationFile(BedrockAnimationFile animationFile) {
@@ -69,7 +75,7 @@ public record BakerOptions(
     }
 
     public BakerOptions withPreservedBonePatterns(Set<Pattern> preservedBonePatterns) {
-        return new BakerOptions(animatedBones, preservedBones, preservedBonePatterns, bakeStaticGeometry, debugFoldedTree);
+        return new BakerOptions(animatedBones, preservedBones, preservedBonePatterns, bakeStaticGeometry, debugFoldedTree, retainCubeGeometry);
     }
 
     public BakerOptions withPreservedBoneRegexes(Set<String> preservedBoneRegexes) {
@@ -81,6 +87,10 @@ public record BakerOptions(
     }
 
     public BakerOptions withDebugFoldedTree(boolean debugFoldedTree) {
-        return new BakerOptions(animatedBones, preservedBones, preservedBonePatterns, bakeStaticGeometry, debugFoldedTree);
+        return new BakerOptions(animatedBones, preservedBones, preservedBonePatterns, bakeStaticGeometry, debugFoldedTree, retainCubeGeometry);
+    }
+
+    public BakerOptions withRetainedCubeGeometry(boolean retainCubeGeometry) {
+        return new BakerOptions(animatedBones, preservedBones, preservedBonePatterns, bakeStaticGeometry, debugFoldedTree, retainCubeGeometry);
     }
 }

@@ -5,14 +5,17 @@ import com.maydaymemory.mae.basic.BoneTransform;
 import com.maydaymemory.mae.basic.Pose;
 import com.maydaymemory.mae.basic.PoseBuilder;
 import com.maydaymemory.mae.basic.Skeleton;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
 import org.joml.Vector3fc;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 public abstract class BoneTreeInstance implements Skeleton {
     private final BoneState[] bones;
@@ -118,6 +121,25 @@ public abstract class BoneTreeInstance implements Skeleton {
     public Pose getBindPose() {
         return bindPose;
     }
+
+    /**
+     * Traces the closed world-space line segment against the current cube pose and returns its nearest hit.
+     */
+    @Nullable
+    public final ModelRayTraceResult rayTrace(Matrix4fc modelRotation, Vec3 modelOrigin, Vec3 rayStart, Vec3 rayEnd) {
+        Objects.requireNonNull(modelRotation, "modelRotation");
+        Objects.requireNonNull(modelOrigin, "modelOrigin");
+        Objects.requireNonNull(rayStart, "rayStart");
+        Objects.requireNonNull(rayEnd, "rayEnd");
+        ModelRayTracer tracer = new ModelRayTracer(modelRotation, modelOrigin, rayStart, rayEnd);
+        if (!tracer.isValid()) {
+            return null;
+        }
+        rayTraceCubes(tracer);
+        return tracer.result();
+    }
+
+    protected abstract void rayTraceCubes(ModelRayTracer tracer);
 
     public abstract int getIndex(String boneName);
 }

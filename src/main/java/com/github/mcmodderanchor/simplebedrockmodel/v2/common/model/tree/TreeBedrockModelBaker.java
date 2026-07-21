@@ -2,6 +2,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.model.LocatorData;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.*;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.LocalCubeBounds;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -13,6 +14,7 @@ import com.maydaymemory.mae.basic.RotationView;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
 import org.joml.Vector3f;
@@ -62,10 +64,11 @@ public class TreeBedrockModelBaker {
             int parentIndex = bone.parent == null ? -1 : bone.parent.index;
             int[] childArray = children.get(i).stream().mapToInt(Integer::intValue).toArray();
             ICube[] cubes = createCubes(sourceBone, bone, texWidth, texHeight);
+            LocalCubeBounds ownCubeBounds = ownCubeBounds(cubes);
             PolyMesh[] polyMeshes = createPolyMeshes(sourceBone, bone, texWidth, texHeight);
             result[i] = new TreeBoneDefinition(bone.name, bone.index, parentIndex, childArray,
                     bone.pivotX, bone.pivotY, bone.pivotZ, bone.bindX, bone.bindY, bone.bindZ,
-                    bone.bindRotation, bone.bindEulerRotation, parseLocators(sourceBone, bone), cubes, polyMeshes,
+                    bone.bindRotation, bone.bindEulerRotation, parseLocators(sourceBone, bone), cubes, ownCubeBounds, polyMeshes,
                     cubes.length > 0, TreeGeometryWriter.hasTriangles(polyMeshes));
         }
         return result;
@@ -109,6 +112,23 @@ public class TreeBedrockModelBaker {
             }
         }
         return cubes.toArray(ICube[]::new);
+    }
+
+    @Nullable
+    private static LocalCubeBounds ownCubeBounds(ICube[] cubes) {
+        LocalCubeBounds.Builder bounds = LocalCubeBounds.builder();
+        for (ICube cube : cubes) {
+            Matrix4f cubeTransform = new Matrix4f();
+            if (cube.hasRotation()) {
+                float[] pivot = cube.pivot();
+                Quaternionf rotation = cube.rotation();
+                cubeTransform.translate(pivot[0], pivot[1], pivot[2]);
+                cubeTransform.rotate(rotation);
+                cubeTransform.translate(-pivot[0], -pivot[1], -pivot[2]);
+            }
+            bounds.includeCube(cube.x(), cube.y(), cube.z(), cube.width(), cube.height(), cube.depth(), cubeTransform);
+        }
+        return bounds.build();
     }
 
     private static PolyMesh[] createPolyMeshes(BonesItem boneItem, CompileBone bone, int texWidth, int texHeight) {
@@ -336,7 +356,7 @@ public class TreeBedrockModelBaker {
             TreeBoneDefinition def = definitions[i];
             result[i] = new TreeBoneDefinition(def.name(), def.index(), def.parentIndex(), def.children(),
                     def.pivotX(), def.pivotY(), def.pivotZ(), def.bindX(), def.bindY(), def.bindZ(),
-                    def.bindRotation(), def.bindEulerRotation(), def.locators(), def.cubes(), def.polyMeshes(),
+                    def.bindRotation(), def.bindEulerRotation(), def.locators(), def.cubes(), def.ownCubeBounds(), def.polyMeshes(),
                     hasQuadsInTree[i], hasVerticesInTree[i]);
         }
         return result;

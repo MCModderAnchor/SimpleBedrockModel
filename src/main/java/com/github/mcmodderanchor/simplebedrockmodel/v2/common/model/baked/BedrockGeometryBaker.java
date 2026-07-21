@@ -39,6 +39,7 @@ public class BedrockGeometryBaker {
     static BakeResult bake(BonesItem[] bones, Map<String, BedrockModelBaker.CompileBone> compileBones,
                            BedrockModelBaker.RuntimeIndex runtimeIndex, int texWidth, int texHeight, BakerOptions options) {
         Map<Integer, BakedGeometryChunkBuilder> chunks = new LinkedHashMap<>();
+        Map<Integer, RetainedCubeGeometryBuilder> retainedCubeGeometry = options.retainCubeGeometry() ? new LinkedHashMap<>() : null;
         for (BonesItem item : bones) {
             BedrockModelBaker.CompileBone sourceBone = compileBones.get(item.getName());
             int attachIndex = options.bakeStaticGeometry() ? BedrockModelBaker.nearestRuntimeAncestorOrSelf(sourceBone) : sourceBone.runtimeIndex;
@@ -49,18 +50,23 @@ public class BedrockGeometryBaker {
             BakedGeometryChunkBuilder builder = chunks.computeIfAbsent(attachIndex, ignored -> new BakedGeometryChunkBuilder());
             if (item.getCubes() != null) {
                 builder.addSourceBone(sourceBone.name);
-                for (CubesItem cube : item.getCubes()) bakeCube(cube, item, sourceBone, texWidth, texHeight, toAttach, normalToAttach, builder);
+                RetainedCubeGeometryBuilder retainedBuilder = retainedCubeGeometry == null ? null
+                        : retainedCubeGeometry.computeIfAbsent(attachIndex, ignored -> new RetainedCubeGeometryBuilder());
+                for (CubesItem cube : item.getCubes()) {
+                    bakeCube(cube, item, sourceBone, texWidth, texHeight, toAttach, normalToAttach, builder, retainedBuilder);
+                }
             }
             if (item.getPolyMesh() != null) {
                 builder.addSourceBone(sourceBone.name);
                 bakePolyMesh(item.getPolyMesh(), sourceBone, texWidth, texHeight, toAttach, normalToAttach, builder);
             }
         }
-        return new BakeResult(toChunks(chunks));
+        return new BakeResult(toChunks(chunks), retainedCubeGeometry == null ? new BakedCubeGeometry[0] : toCubeGeometry(retainedCubeGeometry));
     }
 
     private static void bakeCube(CubesItem cube, BonesItem boneItem, BedrockModelBaker.CompileBone part, int texWidth, int texHeight,
-                                 Matrix4f toAttach, Matrix3f normalToAttach, BakedGeometryChunkBuilder out) {
+                                 Matrix4f toAttach, Matrix3f normalToAttach, BakedGeometryChunkBuilder out,
+                                 RetainedCubeGeometryBuilder retainedCubeGeometry) {
         float[] size = cube.getSize();
         float[] origin = java.util.Arrays.copyOf(cube.getOrigin(), 3);
         float inflate = cube.getInflate();
@@ -87,6 +93,9 @@ public class BedrockGeometryBaker {
             cubeTransform.translate(-cubePivot[0] / 16.0f, -cubePivot[1] / 16.0f, -cubePivot[2] / 16.0f);
         }
         Matrix4f matrix = new Matrix4f(toAttach).mul(cubeTransform);
+        if (retainedCubeGeometry != null) {
+            retainedCubeGeometry.addCube(x0, y0, z0, x1 - x0, y1 - y0, z1 - z0, matrix);
+        }
         Matrix3f normalMatrix = new Matrix3f(normalToAttach).mul(new Matrix3f(cubeTransform));
         boolean mirror = cube.isHasMirror() ? cube.isMirror() : boneItem.isMirror();
         if (cube.getFaceUv() == null) {
@@ -347,6 +356,39 @@ public class BedrockGeometryBaker {
         return chunks.toArray(BakedGeometryChunk[]::new);
     }
 
-    record BakeResult(BakedGeometryChunk[] chunks) {}
+    private static BakedCubeGeometry[] toCubeGeometry(Map<Integer, RetainedCubeGeometryBuilder> builders) {
+        ArrayList<BakedCubeGeometry> geometry = new ArrayList<>();
+        for (Map.Entry<Integer, RetainedCubeGeometryBuilder> entry : builders.entrySet()) {
+            RetainedCubeGeometryBuilder builder = entry.getValue();
+            if (!builder.hasCubes()) continue;
+            geometry.add(builder.toGeometry(entry.getKey()));
+        }
+        return geometry.toArray(BakedCubeGeometry[]::new);
+    }
+
+    record BakeResult(BakedGeometryChunk[] chunks, BakedCubeGeometry[] cubeGeometry) {}
+
+    private static final class RetainedCubeGeometryBuilder {
+        private final ArrayList<BakedCube> cubes = new ArrayList<>();
+        private final LocalCubeBounds.Builder bounds = LocalCubeBounds.builder();
+
+        void addCube(float x, float y, float z, float width, float height, float depth, Matrix4f localTransform) {
+            cubes.add(new BakedCube(x, y, z, width, height, depth, localTransform));
+            bounds.includeCube(x, y, z, width, height, depth, localTransform);
+        }
+
+        boolean hasCubes() {
+            return !cubes.isEmpty();
+        }
+
+        BakedCubeGeometry toGeometry(int attachBoneIndex) {
+            LocalCubeBounds localBounds = bounds.build();
+            if (localBounds == null) {
+                throw new IllegalStateException("retained cube geometry has no bounds");
+            }
+            return new BakedCubeGeometry(attachBoneIndex, localBounds, cubes.toArray(BakedCube[]::new));
+        }
+    }
+
     private record PolyMeshVertex(Vector3f position, Vector3f normal, float u, float v) {}
 }
