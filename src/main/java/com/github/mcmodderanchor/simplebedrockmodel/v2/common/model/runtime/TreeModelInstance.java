@@ -63,6 +63,29 @@ public class TreeModelInstance extends BoneTreeInstance {
         baseModel.renderToBuffer(this, poseStack, bufferSource, quadRenderType, triangleRenderType, packedLight, packedOverlay, red, green, blue, alpha, skipNormalVisibilityCull);
     }
 
+    @OnlyIn(Dist.CLIENT)
+    public void renderSingleBonePass(PoseStack poseStack, int boneIndex, VertexConsumer buffer, int packedLight, int packedOverlay,
+                                     float red, float green, float blue, float alpha, boolean quadsPass, boolean skipNormalVisibilityCull) {
+        poseStack.pushPose();
+        mulParentGlobalTransform(poseStack, boneIndex);
+        baseModel.renderBone(this, boneIndex, poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha,
+                quadsPass, skipNormalVisibilityCull);
+        poseStack.popPose();
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public void renderSingleBone(PoseStack poseStack, int boneIndex, MultiBufferSource bufferSource, RenderType quadRenderType,
+                                 RenderType triangleRenderType, int packedLight, int packedOverlay, float red, float green, float blue,
+                                 float alpha, boolean skipNormalVisibilityCull) {
+        poseStack.pushPose();
+        mulParentGlobalTransform(poseStack, boneIndex);
+        baseModel.renderBone(this, boneIndex, poseStack, bufferSource.getBuffer(quadRenderType), packedLight, packedOverlay,
+                red, green, blue, alpha, true, skipNormalVisibilityCull);
+        baseModel.renderBone(this, boneIndex, poseStack, bufferSource.getBuffer(triangleRenderType), packedLight, packedOverlay,
+                red, green, blue, alpha, false, skipNormalVisibilityCull);
+        poseStack.popPose();
+    }
+
     @Override
     public int getIndex(String boneName) {
         return baseModel.getIndex(boneName);

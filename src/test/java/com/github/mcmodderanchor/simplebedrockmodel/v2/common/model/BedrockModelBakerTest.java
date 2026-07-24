@@ -9,7 +9,9 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakerO
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BedrockModelBaker;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneState;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BoneTreeInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.ModelRayTraceResult;
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBoneDefinition;
@@ -260,6 +262,41 @@ class BedrockModelBakerTest {
     }
 
     @Test
+    @DisplayName("global bone normal and PoseStack helpers stay correct for tree and baked models")
+    void globalBoneNormalAndPoseStackHelpersStayCorrect() {
+        BedrockModelPOJO pojo = loadInlineModel("""
+                {
+                  "format_version": "1.12.0",
+                  "minecraft:geometry": [{
+                    "description": {"identifier":"geometry.global_normal", "texture_width":16, "texture_height":16},
+                    "bones": [
+                      {"name":"root", "pivot":[0,0,0]},
+                      {"name":"child", "parent":"root", "pivot":[0,0,0]}
+                    ]
+                  }]
+                }
+                """);
+        TreeModelInstance tree = TreeBedrockModel.bake(pojo).createInstance();
+        BakedModelInstance baked = BakedBedrockModel.bake(pojo,
+                BakerOptions.ofAnimatedBones(Set.of("root", "child"))).createInstance();
+
+        configureGlobalNormalPose(tree);
+        configureGlobalNormalPose(baked);
+        int treeChildIndex = tree.getIndex("child");
+        int bakedChildIndex = baked.getIndex("child");
+        assertGlobalNormalAndPoseStackHelpers(tree, treeChildIndex);
+        assertGlobalNormalAndPoseStackHelpers(baked, bakedChildIndex);
+        assertPoseStackRestored(poseStack -> tree.renderSingleBonePass(poseStack, treeChildIndex, null,
+                0, 0, 1.0f, 1.0f, 1.0f, 1.0f, true, false));
+        assertPoseStackRestored(poseStack -> tree.renderSingleBone(poseStack, treeChildIndex, renderType -> null, null, null,
+                0, 0, 1.0f, 1.0f, 1.0f, 1.0f, false));
+        assertPoseStackRestored(poseStack -> baked.renderSingleBonePass(poseStack, bakedChildIndex, null,
+                0, 0, 1.0f, 1.0f, 1.0f, 1.0f, true, false));
+        assertPoseStackRestored(poseStack -> baked.renderSingleBone(poseStack, bakedChildIndex, renderType -> null, null, null,
+                0, 0, 1.0f, 1.0f, 1.0f, 1.0f, false));
+    }
+
+    @Test
     @DisplayName("tree and baked ray tracing agree for animated poses and world transforms")
     void treeAndBakedRayTracingAgreeForAnimatedWorldPose() {
         BedrockModelPOJO pojo = loadInlineModel("""
@@ -385,6 +422,67 @@ class BedrockModelBakerTest {
         assertVecEquals(Vec3.ZERO, compatibilityHit.attachmentOffset(), 1.0e-6);
     }
 
+    private static void configureGlobalNormalPose(BoneTreeInstance instance) {
+        BoneState root = instance.getBone("root");
+        assertNotNull(root);
+        root.x = 8.0f;
+        root.y = -4.0f;
+        root.z = 3.0f;
+        root.rotation.set(new Quaternionf().rotateZYX(0.2f, 0.4f, -0.1f));
+        root.xScale = 1.25f;
+        root.yScale = 0.75f;
+        root.zScale = 0.9f;
+
+        BoneState child = instance.getBone("child");
+        assertNotNull(child);
+        child.x = -6.0f;
+        child.y = 5.0f;
+        child.z = 2.0f;
+        child.rotation.set(new Quaternionf().rotateYXZ(-0.3f, 0.15f, 0.25f));
+        child.xScale = 0.8f;
+        child.yScale = 1.4f;
+        child.zScale = 0.65f;
+    }
+
+    private static void assertGlobalNormalAndPoseStackHelpers(BoneTreeInstance instance, int boneIndex) {
+        Matrix4f globalTransform = instance.getGlobalTransform(boneIndex);
+        Matrix3f expectedGlobalNormal = new Matrix3f(globalTransform).invert().transpose();
+        assertMatrixEquals(expectedGlobalNormal, instance.getGlobalNormal(boneIndex), 1.0e-6f);
+
+        PoseStack globalPoseStack = newNonIdentityPoseStack();
+        Matrix4f expectedGlobalPose = new Matrix4f(globalPoseStack.last().pose()).mul(globalTransform);
+        Matrix3f expectedGlobalPoseNormal = new Matrix3f(globalPoseStack.last().normal()).mul(expectedGlobalNormal);
+        instance.mulGlobalTransform(globalPoseStack, boneIndex);
+        assertMatrixEquals(expectedGlobalPose, globalPoseStack.last().pose(), 1.0e-6f);
+        assertMatrixEquals(expectedGlobalPoseNormal, globalPoseStack.last().normal(), 1.0e-6f);
+
+        int parentIndex = instance.getFather(boneIndex);
+        PoseStack parentPoseStack = newNonIdentityPoseStack();
+        Matrix4f expectedParentPose = new Matrix4f(parentPoseStack.last().pose()).mul(instance.getGlobalTransform(parentIndex));
+        Matrix3f expectedParentNormal = new Matrix3f(parentPoseStack.last().normal()).mul(instance.getGlobalNormal(parentIndex));
+        instance.mulParentGlobalTransform(parentPoseStack, boneIndex);
+        assertMatrixEquals(expectedParentPose, parentPoseStack.last().pose(), 1.0e-6f);
+        assertMatrixEquals(expectedParentNormal, parentPoseStack.last().normal(), 1.0e-6f);
+
+    }
+
+    private static void assertPoseStackRestored(java.util.function.Consumer<PoseStack> renderer) {
+        PoseStack poseStack = newNonIdentityPoseStack();
+        Matrix4f expectedPose = new Matrix4f(poseStack.last().pose());
+        Matrix3f expectedNormal = new Matrix3f(poseStack.last().normal());
+        renderer.accept(poseStack);
+        assertMatrixEquals(expectedPose, poseStack.last().pose(), 1.0e-6f);
+        assertMatrixEquals(expectedNormal, poseStack.last().normal(), 1.0e-6f);
+    }
+
+    private static PoseStack newNonIdentityPoseStack() {
+        PoseStack poseStack = new PoseStack();
+        poseStack.translate(0.5f, -1.25f, 2.0f);
+        poseStack.mulPose(new Quaternionf().rotateXYZ(0.1f, -0.2f, 0.3f));
+        poseStack.scale(1.2f, 0.85f, 1.1f);
+        return poseStack;
+    }
+
     private static void configureRayPose(BoneState bone) {
         bone.x = 8.0f;
         bone.y = -4.0f;
@@ -453,6 +551,18 @@ class BedrockModelBakerTest {
         InputStream stream = BedrockModelBakerTest.class.getClassLoader().getResourceAsStream(resourceName);
         assertNotNull(stream, "Resource not found: " + resourceName);
         return stream;
+    }
+
+    private static void assertMatrixEquals(Matrix3f expected, Matrix3f actual, float epsilon) {
+        assertEquals(expected.m00(), actual.m00(), epsilon);
+        assertEquals(expected.m01(), actual.m01(), epsilon);
+        assertEquals(expected.m02(), actual.m02(), epsilon);
+        assertEquals(expected.m10(), actual.m10(), epsilon);
+        assertEquals(expected.m11(), actual.m11(), epsilon);
+        assertEquals(expected.m12(), actual.m12(), epsilon);
+        assertEquals(expected.m20(), actual.m20(), epsilon);
+        assertEquals(expected.m21(), actual.m21(), epsilon);
+        assertEquals(expected.m22(), actual.m22(), epsilon);
     }
 
     private static void assertMatrixEquals(Matrix4f expected, Matrix4f actual, float epsilon) {
