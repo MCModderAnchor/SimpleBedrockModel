@@ -5,8 +5,12 @@ import com.maydaymemory.mae.basic.BoneTransform;
 import com.maydaymemory.mae.basic.Pose;
 import com.maydaymemory.mae.basic.PoseBuilder;
 import com.maydaymemory.mae.basic.Skeleton;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
@@ -68,6 +72,49 @@ public abstract class BoneTreeInstance implements Skeleton {
             matrix.mul(chain.get(i).getLocalTransform());
         }
         return matrix;
+    }
+
+    /**
+     * Returns the inverse-transpose normal matrix for a bone's current global transform.
+     * Invalid or non-invertible transforms fall back to the identity matrix so they cannot
+     * introduce non-finite values into a render pose.
+     */
+    public Matrix3f getGlobalNormal(int index) {
+        Matrix3f normal = new Matrix3f(getGlobalTransform(index));
+        float determinant = normal.determinant();
+        if (!Float.isFinite(determinant) || determinant == 0.0F) {
+            return normal.identity();
+        }
+        normal.invert().transpose();
+        return isFinite(normal) ? normal : normal.identity();
+    }
+
+    /**
+     * Multiplies the current pose by a bone's global position and normal transforms.
+     * Callers retain responsibility for matching {@link PoseStack#pushPose()} and
+     * {@link PoseStack#popPose()} calls.
+     */
+    @OnlyIn(Dist.CLIENT)
+    public void mulGlobalTransform(PoseStack poseStack, int index) {
+        poseStack.mulPoseMatrix(getGlobalTransform(index));
+        poseStack.last().normal().mul(getGlobalNormal(index));
+    }
+
+    /**
+     * Multiplies the current pose by the parent transform of {@code boneIndex}.
+     * This is intended for rendering that bone through an existing {@code renderBone(...)}
+     * method, which applies the target bone's local transform itself.
+     */
+    @OnlyIn(Dist.CLIENT)
+    public void mulParentGlobalTransform(PoseStack poseStack, int boneIndex) {
+        BoneState bone = getBone(boneIndex);
+        mulGlobalTransform(poseStack, bone == null ? -1 : bone.parentIndex());
+    }
+
+    private static boolean isFinite(Matrix3f matrix) {
+        return Float.isFinite(matrix.m00()) && Float.isFinite(matrix.m01()) && Float.isFinite(matrix.m02())
+                && Float.isFinite(matrix.m10()) && Float.isFinite(matrix.m11()) && Float.isFinite(matrix.m12())
+                && Float.isFinite(matrix.m20()) && Float.isFinite(matrix.m21()) && Float.isFinite(matrix.m22());
     }
 
     @Override

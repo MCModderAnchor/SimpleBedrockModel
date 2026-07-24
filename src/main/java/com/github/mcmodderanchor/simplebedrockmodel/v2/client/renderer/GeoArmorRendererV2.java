@@ -134,19 +134,9 @@ public class GeoArmorRendererV2 extends HumanoidModel<LivingEntity> implements I
             return;
         }
 
-        RenderType renderType = getRenderType(getTexture());
-        VertexConsumer consumer = bufferSource.getBuffer(renderType);
-
-        poseStack.pushPose();
-        poseStack.mulPoseMatrix(this.instance.getGlobalTransform(armBone.parentIndex()));
-        this.model.renderBone(this.instance, armBone.index(), poseStack, consumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F, true, true);
-        poseStack.popPose();
-
-        VertexConsumer triangleConsumer = bufferSource.getBuffer(BedrockModelRenderTypes.polyMeshCutout(getTexture()));
-        poseStack.pushPose();
-        poseStack.mulPoseMatrix(this.instance.getGlobalTransform(armBone.parentIndex()));
-        this.model.renderBone(this.instance, armBone.index(), poseStack, triangleConsumer, packedLight, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F, false, true);
-        poseStack.popPose();
+        this.instance.renderSingleBone(poseStack, armBone.index(), bufferSource, getRenderType(getTexture()),
+                BedrockModelRenderTypes.polyMeshCutout(getTexture()), packedLight, OverlayTexture.NO_OVERLAY,
+                1.0F, 1.0F, 1.0F, 1.0F, true);
     }
 
     public RenderType getRenderType(ResourceLocation texture) {
