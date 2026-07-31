@@ -216,7 +216,9 @@ publishing {
             artifactId = archivesBaseName
             version = project.version
 
-            from components.java
+            // 仅发布最终 Mod JAR 与源码包；不要从 Java component 导出开发/运行依赖。
+            artifact tasks.named('jar')
+            artifact tasks.named('sourcesJar')
 
             pom {
                 name = mod_name
