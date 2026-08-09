@@ -32,13 +32,13 @@ repositories {
 }
 
 dependencies {
-    jarJar(implementation(fg.deobf("com.github.mcmodderanchor:simplebedrockmodel:2.2.2-forge-mc1.20.1"))) {
-        jarJar.ranged(it, "[2.2.2,)")
+    jarJar(implementation(fg.deobf("com.github.mcmodderanchor:simplebedrockmodel:2.5.1-forge-mc1.20.1"))) {
+        jarJar.ranged(it, "[2.5.1,)")
     }
     // The animation library is already included in jar (jar in jar), 
-    // but since modrinth maven cannot handle transitive dependencies,
+    // but since we exclude transitive dependencies,
     // you need to include it to pass the compilation.
-    compileOnly("com.maydaymemory:mae:1.1.2") {
+    compileOnly("com.maydaymemory:mae:1.1.4") {
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
         exclude group: 'it.unimi.dsi', module: 'fastutil'
         exclude group: 'org.joml', module: 'joml'
@@ -58,108 +58,20 @@ repositories {
 }
 
 dependencies {
-    implementation jarJar("com.github.mcmodderanchor:simplebedrockmodel:2.2.2-neoforge-mc1.21.1") {
+    implementation jarJar("com.github.mcmodderanchor:simplebedrockmodel:2.5.1-neoforge-mc1.21.1") {
         version {
-            prefer '2.2.2'
+            prefer '2.5.1'
         }
     }
     // The animation library is already included in jar (jar in jar), 
-    // but since modrinth maven cannot handle transitive dependencies,
+    // but since we exclude transitive dependencies,
     // you need to include it to pass the compilation.
-    compileOnly("com.maydaymemory:mae:1.1.2") {
+    compileOnly("com.maydaymemory:mae:1.1.4") {
         exclude group: 'com.google.code.findbugs', module: 'jsr305'
         exclude group: 'it.unimi.dsi', module: 'fastutil'
         exclude group: 'org.joml', module: 'joml'
     }
 }
-```
-
-## 📖 Usage Examples
-
-### Loading a Bedrock Model
-
-There is a utility class "GsonUtil" to help you create pojo from json:
-
-```java
-InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-Gson gson = GsonUtil.GSON;
-BedrockModelPOJO pojo = gson.fromJson(reader, BedrockModelPOJO.class);
-BedrockModel model = new BedrockModel(pojo);
-```
-
-### Loading a Bedrock Animations
-
-There is a utility class "GsonUtil" to help you create pojo from json:
-```java
-BedrockModel model = ...;
-BoneIndexProvider indexProvider = new BedrockModelBoneIndexProvider(model);
-InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-Gson gson = GsonUtil.GSON;
-BedrockAnimationFile pojo = gson.fromJson(reader, BedrockAnimationFile.class);
-```
-
-**Animation Instance Construct:** A utility class "Animations" could help construct animation instance as long as you got the pojo.
-
-```java
-BedrockAnimationFile animationFilePojo = ...;
-BedrockAnimationPOJO animationPojo = ...;
-BedrockModel model = ...;
-BoneIndexProvider indexProvider = new BedrockModelBoneIndexProvider(model);
-// BedrockAnimationFile represents a complete Bedrock Edition animation file, 
-// which containing multiple animations.
-List<BedrockAnimation> animations = Animations.createAnimation(animationFilePojo, indexProvider);
-// BedrockAnimationPOJO represents a single animation.
-BedrockAnimation animation = Animations.createAnimation("animation_name", animationPojo, indexProvider);
-```
-
-### Create Animation Runner
-
-Animation Runner can control the progress of animation according to time, and estimate Pose, Animation Events and Curves according to the progress.
-
-```java
-BedrockAnimation animation = ...;
-// use getSpecifiedEndTimeS because bedrock animation has its own end time.
-AnimationContext animationContext = new AnimationContext(animation.getSpecifiedEndTimeS()); 
-animationContext.setState(new LoopingState(System::nanoTime));
-AnimationRunner animationRunner = new AnimationRunner(animation, animationContext);
-
-// somewhere else
-Pose pose = animationRunner.evaluate();
-```
-
-### Apply animations to model
-
-```java
-// According to the Bedrock Edition animation standard,
-// this type of blender must be used and ZYX BoneTransform must be used.
-AdditiveBlender blender = new SimpleAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
-
-// Before rendering
-Pose bindPose = model.getBindPose(); // The initial pose of the model
-Pose animationPose = ...; // For example, animationRunner.evaluate()
-Pose blended = blender.blend(bindPose, animationPose);
-// Apply animation to model
-model.applyPose(blended);
-// Rendering
-model.renderToBuffer(poseStack, buffer, packedLight, packedOverlay);
-// After Rendering, You can choose whether to restore to binding pose according to your usage.
-// model.applyPose(bindPose);
-```
-
-### How to use animation blending
-
-[See the documentation of Mayday Animation Engine](https://github.com/286799714/MaydayAnimationEngine)
-
-## 🏗️ Project Structure
-
-```
-src/main/java/com/github/mcmodderanchor/simplebedrockmodel/
-├── v1/client/bedrock/
-│   ├── model/           # Core model classes
-│   ├── animation/       # Animation system
-│   ├── pojo/           # Data transfer objects
-│   └── compat/         # Compatibility layers
-└── example/            # Usage examples, not included in builds
 ```
 
 ## 📝 License
