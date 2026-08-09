@@ -1,7 +1,6 @@
 # SimpleBedrockModel
 
 [![License](https://img.shields.io/badge/License-LGPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Modrinth](https://img.shields.io/badge/Modrinth-Available-00AF5C?style=for-the-badge&logo=modrinth)](https://modrinth.com/mod/simplebedrockmodel)
 
 > A simple library for loading and rendering Minecraft Bedrock Edition entity models and animations in Java Edition
 
