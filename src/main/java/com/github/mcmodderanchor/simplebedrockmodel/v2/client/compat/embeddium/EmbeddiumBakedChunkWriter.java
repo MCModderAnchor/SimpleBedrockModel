@@ -8,6 +8,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedV
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.embeddedt.embeddium.api.vertex.buffer.VertexBufferWriter;
+import org.embeddedt.embeddium.api.vertex.format.common.ModelVertex;
 import org.embeddedt.embeddium.impl.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -20,11 +21,16 @@ public class EmbeddiumBakedChunkWriter implements IEmbeddiumVertexWriter, ChunkV
 
     public boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
                               Matrix4f finalPose, Matrix3f finalNormal) {
+        return writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, false);
+    }
+
+    public boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
+                              Matrix4f finalPose, Matrix3f finalNormal, boolean skipNormalVisibilityCull) {
         VertexBufferWriter writer = VertexConsumerUtils.convertOrLog(consumer);
         if (writer == null) {
             return false;
         }
-        return writeQuads(chunk, writer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        return writeQuads(chunk, writer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
     }
 
     public boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
@@ -37,7 +43,7 @@ public class EmbeddiumBakedChunkWriter implements IEmbeddiumVertexWriter, ChunkV
     }
 
     private boolean writeQuads(BakedGeometryChunk chunk, VertexBufferWriter writer, int lightmap, int overlay, float red, float green, float blue, float alpha,
-                               Matrix4f finalPose, Matrix3f finalNormal) {
+                               Matrix4f finalPose, Matrix3f finalNormal, boolean skipNormalVisibilityCull) {
         int color = (int) (alpha * 255.0f) << 24 | (int) (blue * 255.0f) << 16 | (int) (green * 255.0f) << 8 | (int) (red * 255.0f);
         float p00 = finalPose.m00(), p01 = finalPose.m01(), p02 = finalPose.m02();
         float p10 = finalPose.m10(), p11 = finalPose.m11(), p12 = finalPose.m12();
@@ -50,7 +56,7 @@ public class EmbeddiumBakedChunkWriter implements IEmbeddiumVertexWriter, ChunkV
         float[] positions = quads.positions();
         float[] normals = quads.normals();
         float[] uvs = quads.uvs();
-        boolean cull = RenderSystem.getModelViewMatrix().m32() == 0;
+        boolean cull = !skipNormalVisibilityCull && RenderSystem.getModelViewMatrix().m32() == 0;
         int emitted = 0;
         long ptr = SCRATCH;
         for (int i = 0; i < quads.quadCount(); i++) {
@@ -147,5 +153,12 @@ public class EmbeddiumBakedChunkWriter implements IEmbeddiumVertexWriter, ChunkV
         float ty = p01 * cx + p11 * cy + p21 * cz + p31 + p31;
         float tz = p02 * cx + p12 * cy + p22 * cz + p32 + p32;
         return tx * nx + ty * ny + tz * nz > 0;
+    }
+
+    @Override
+    public void flush(VertexBufferWriter writer, int vertexCount) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            writer.push(stack, SCRATCH, vertexCount, ModelVertex.FORMAT);
+        }
     }
 }

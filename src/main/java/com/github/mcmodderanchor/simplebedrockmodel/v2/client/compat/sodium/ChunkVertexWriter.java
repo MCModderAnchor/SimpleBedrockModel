@@ -9,7 +9,7 @@ public interface ChunkVertexWriter {
     ChunkVertexWriter NOOP = new ChunkVertexWriter() {
         @Override
         public boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
-                                  float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
+                                  float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal, boolean skipNormalVisibilityCull) {
             return false;
         }
 
@@ -21,7 +21,7 @@ public interface ChunkVertexWriter {
     };
 
     boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
-                       float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal);
+                       float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal, boolean skipNormalVisibilityCull);
 
     boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
                           float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal);

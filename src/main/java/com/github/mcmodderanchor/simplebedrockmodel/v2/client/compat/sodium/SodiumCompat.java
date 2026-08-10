@@ -23,10 +23,7 @@ public final class SodiumCompat {
     public static boolean writeQuads(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
                                      float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal,
                                      boolean skipNormalVisibilityCull) {
-        if (WRITER instanceof SodiumBakedChunkWriter sodiumWriter) {
-            return sodiumWriter.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
-        }
-        return WRITER.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        return WRITER.writeQuads(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal, skipNormalVisibilityCull);
     }
 
     public static boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
