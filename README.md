@@ -58,9 +58,9 @@ repositories {
 }
 
 dependencies {
-    implementation jarJar("com.github.mcmodderanchor:simplebedrockmodel:2.5.1-neoforge-mc1.21.1") {
+    implementation jarJar("com.github.mcmodderanchor:simplebedrockmodel:2.5.1.1-neoforge-mc1.21.1") {
         version {
-            prefer '2.5.1'
+            prefer '2.5.1.1'
         }
     }
     // The animation library is already included in jar (jar in jar), 
