@@ -36,6 +36,13 @@ public class ParticleEmitterInstance {
     // Runtime 组件调度
     private final List<IEmitterComponent> emitterUpdateComponents = new ArrayList<>();
 
+    /**
+     * 每实例 molang 变量覆盖表：在 {@link #bindEmitterContext()} 时写入共享变量存储，
+     * 仅在该发射器自身 tick 期间生效（绑定紧随本发射器的粒子更新，天然按实例隔离，不跨发射器串扰）。
+     * 定义中的表达式（size/tinting/initial_speed 等）可直接读取这些变量。
+     */
+    private final Map<String, Float> variableOverrides = new HashMap<>();
+
     private final int emitterRandom1 = RANDOM.nextInt();
     private final int emitterRandom2 = RANDOM.nextInt();
     private final int emitterRandom3 = RANDOM.nextInt();
@@ -144,6 +151,12 @@ public class ParticleEmitterInstance {
         for (Map.Entry<String, ParticleCurve> entry : curves.entrySet()) {
             float value = CurveEvaluator.evaluate(entry.getValue(), molang.getContext(), entry.getKey());
             molang.getVariableStorage().set(entry.getKey(), NumberValue.of(value));
+        }
+        // 应用外部注入的每实例变量覆盖
+        if (!variableOverrides.isEmpty()) {
+            for (Map.Entry<String, Float> entry : variableOverrides.entrySet()) {
+                molang.getVariableStorage().set(entry.getKey(), NumberValue.of(entry.getValue()));
+            }
         }
     }
 
@@ -332,6 +345,48 @@ public class ParticleEmitterInstance {
     public void setEmitterLifetime(float lt) { this.emitterLifetime = lt; }
 
     public void bindContextAndCurves() { bindEmitterContext(); }
+
+    /**
+     * 注入一个仅对本发射器生效的 molang 变量（定义表达式中以 {@code v.<name>} 读取）。
+     * <p>
+     * 应在发射器首次 tick（产生粒子）之前调用；覆盖值会随每次上下文绑定写入共享变量存储，
+     * 仅在该发射器自身 tick 期间可见，不影响同系统其它发射器。
+     *
+     * @param name  变量名（不含 {@code v.} 前缀）
+     * @param value 数值
+     */
+    public void setVariable(String name, float value) {
+        variableOverrides.put(name, value);
+    }
+
+    /**
+     * 锚点跟随标志：启用后，本发射器产出的世界粒子（SnowStormParticle）在渲染时按
+     * {@link #setEmitterTransform} 的 worldTransform 相对出生锚点的平移逐帧补偿，
+     * 使粒子跟随移动的锚点（如持枪者的枪口）。
+     */
+    private boolean followAnchor;
+
+    public void setFollowAnchor(boolean followAnchor) {
+        this.followAnchor = followAnchor;
+    }
+
+    public boolean isFollowAnchor() {
+        return followAnchor;
+    }
+
+    /**
+     * 移除此前注入的变量覆盖。
+     */
+    public void removeVariable(String name) {
+        variableOverrides.remove(name);
+    }
+
+    /**
+     * 清空全部变量覆盖。
+     */
+    public void clearVariables() {
+        variableOverrides.clear();
+    }
 
     public ParticleEffectDefinition getDefinition() { return definition; }
     public ParticleMolangEnvironment getMolang() { return molang; }

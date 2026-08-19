@@ -37,6 +37,16 @@ public class SnowStormParticle extends TextureSheetParticle {
     private final ParticleEffectDefinition definition;
     private final ParticleEmitterInstance emitter;
 
+    // 锚点跟随：发射器启用 followAnchor 时，粒子保存锚点局部坐标，
+    // 渲染时用发射器当前 worldTransform（含旋转+平移）重新求世界坐标——位置与朝向均跟随锚点
+    private final boolean followAnchor;
+    private final float localX;
+    private final float localY;
+    private final float localZ;
+
+    // 锚点跟随渲染用的临时世界坐标
+    private static final Vector3f FOLLOW_POS = new Vector3f();
+
     // billboard 朝向模式
     private final ParticleAppearanceBillboard.FaceCameraMode faceCameraMode;
 
@@ -126,6 +136,22 @@ public class SnowStormParticle extends TextureSheetParticle {
         // RenderType
         ParticleDescription desc = definition.getDescription();
         this.renderType = MolangWorldParticleRenderType.get(desc.getMaterial(), desc.getTexture());
+
+        // 锚点跟随：记录出生锚点（发射器 worldTransform），并把当前世界坐标反算为锚点局部坐标；
+        // 渲染时用当前 worldTransform 重新变换回世界坐标，位置与朝向均跟随锚点
+        this.followAnchor = emitter.isFollowAnchor();
+        if (followAnchor) {
+            Matrix4f spawnTransform = new Matrix4f(emitter.getWorldTransform()).invert();
+            Vector4f local = new Vector4f(particleData.x, particleData.y, particleData.z, 1.0f);
+            spawnTransform.transform(local);
+            this.localX = local.x;
+            this.localY = local.y;
+            this.localZ = local.z;
+        } else {
+            this.localX = 0;
+            this.localY = 0;
+            this.localZ = 0;
+        }
     }
 
     @Override
@@ -253,9 +279,18 @@ public class SnowStormParticle extends TextureSheetParticle {
     @Override
     public void render(VertexConsumer buffer, Camera camera, float partialTicks) {
         Vec3 camPos = camera.getPosition();
-        float cx = (float) (Mth.lerp(partialTicks, this.xo, this.x) - camPos.x());
-        float cy = (float) (Mth.lerp(partialTicks, this.yo, this.y) - camPos.y());
-        float cz = (float) (Mth.lerp(partialTicks, this.zo, this.z) - camPos.z());
+        float cx, cy, cz;
+        if (followAnchor) {
+            // 锚点跟随：用发射器当前 worldTransform（含旋转+平移）把局部坐标变换回世界坐标
+            emitter.getWorldTransform().transformPosition(localX, localY, localZ, FOLLOW_POS);
+            cx = FOLLOW_POS.x - (float) camPos.x();
+            cy = FOLLOW_POS.y - (float) camPos.y();
+            cz = FOLLOW_POS.z - (float) camPos.z();
+        } else {
+            cx = (float) (Mth.lerp(partialTicks, this.xo, this.x) - camPos.x());
+            cy = (float) (Mth.lerp(partialTicks, this.yo, this.y) - camPos.y());
+            cz = (float) (Mth.lerp(partialTicks, this.zo, this.z) - camPos.z());
+        }
 
         // 构建朝向四元数
         QUATERNION.identity();

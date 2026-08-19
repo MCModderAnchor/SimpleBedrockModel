@@ -28,7 +28,19 @@ public final class AcceleratedRenderingCompat {
         return LOADED && BackendHolder.RENDERED.renderMeshes(bone, pose, consumer, lightmap, overlay, red, green, blue, alpha);
     }
 
+    /**
+     * 用 AR 加速渲染一个第一人称粒子 billboard（使粒子与枪体同加速层、被模板剔除）。
+     * 返回 true 表示已走加速管线，调用方应停止原路径绘制。
+     */
+    public static boolean renderParticleBillboard(VertexConsumer consumer,
+                                                  com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance particle,
+                                                  org.joml.Matrix4f effectivePose, org.joml.Matrix3f normal,
+                                                  int light) {
+        return LOADED && BackendHolder.PARTICLE_RENDER.renderBillboard(consumer, particle, effectivePose, normal, light);
+    }
+
     private static final class BackendHolder {
         private static final AcceleratedRenderer RENDERED = new AcceleratedRenderer();
+        private static final AcceleratedParticleRenderer PARTICLE_RENDER = new AcceleratedParticleRenderer();
     }
 }

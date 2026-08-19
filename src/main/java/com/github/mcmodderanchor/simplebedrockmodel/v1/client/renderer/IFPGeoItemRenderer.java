@@ -120,6 +120,21 @@ public interface IFPGeoItemRenderer {
         // 默认空实现，由有粒子效果的渲染器覆写
     }
 
+    /**
+     * 该渲染器是否在自身的模型渲染窗口内（模板测试仍开启时）自行渲染粒子。
+     * <p>
+     * 需要让第一人称粒子被瞄具的模板缓冲剔除（如枪口火光/烟雾不穿透镜片）时覆写并返回
+     * {@code true}：渲染器在 {@link #renderFirstPerson} 的模型渲染窗口内调用
+     * {@link FirstPersonRenderHandler#renderParticlesNow} 提交粒子并 flush；
+     * 返回 {@code true} 后 {@code FirstPersonRenderHandler} 将跳过事件末尾的自动粒子渲染，
+     * 避免双重绘制。
+     * <p>
+     * 默认返回 {@code false}（由 SBM 在事件末尾统一渲染）。
+     */
+    default boolean renderParticlesInModelWindow() {
+        return false;
+    }
+
     void renderFirstPerson(LocalPlayer player, ItemStack stack, ItemDisplayContext ctx, PoseStack poseStack, MultiBufferSource bufferSource,
                                   int light, float partialTick);
 }
