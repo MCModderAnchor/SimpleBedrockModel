@@ -180,8 +180,61 @@ public class WorldEmitterManager {
 
     private void updateEmitterTransform(ActiveWorldEmitter active) {
         Matrix4f identity = new Matrix4f();
-        Matrix4f worldTransform = new Matrix4f().translation((float) active.worldX, (float) active.worldY, (float) active.worldZ);
+        Matrix4f worldTransform;
+        if (active.anchorMatrix != null) {
+            // 完整锚点（含旋转）：由调用方每帧提供，粒子位置与朝向均跟随
+            worldTransform = active.anchorMatrix;
+        } else {
+            worldTransform = new Matrix4f().translation((float) active.worldX, (float) active.worldY, (float) active.worldZ);
+        }
         active.emitter.setEmitterTransform(identity, worldTransform);
+    }
+
+    /**
+     * 更新发射器的世界锚点（仅平移）。配合发射器的 {@code followAnchor} 让已生成的
+     * 世界粒子随锚点平移跟随。
+     *
+     * @return 是否找到并更新成功（发射器可能已结束并从管理器移除）
+     */
+    public boolean updateEmitterPosition(ParticleEmitterInstance emitter, Vec3 pos) {
+        for (ActiveWorldEmitter active : emitters) {
+            if (active.emitter == emitter) {
+                active.worldX = pos.x;
+                active.worldY = pos.y;
+                active.worldZ = pos.z;
+                active.anchorMatrix = null;
+                // 立即同步 worldTransform，粒子渲染（SnowStormParticle.render）无需等待下一次
+                // 管理器的 client tick 即可读到新锚点——实现渲染帧级跟随
+                updateEmitterTransform(active);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 更新发射器的完整世界锚点（旋转 + 平移）。配合 {@code followAnchor}，已生成的世界粒子
+     * 每帧按此矩阵重新定位——位置与朝向均跟随锚点（如持枪者的枪口）。
+     * <p>
+     * 立即同步 {@code worldTransform}：本方法由渲染线程调用（渲染帧频率可能高于 client tick），
+     * 若等待管理器下次 tick 再刷新，粒子跟随会滞后最多一个 tick（50ms）。
+     *
+     * @return 是否找到并更新成功（发射器可能已结束并从管理器移除）
+     */
+    public boolean updateEmitterAnchor(ParticleEmitterInstance emitter, Matrix4f anchor) {
+        for (ActiveWorldEmitter active : emitters) {
+            if (active.emitter == emitter) {
+                active.anchorMatrix = new Matrix4f(anchor);
+                active.worldX = anchor.m30();
+                active.worldY = anchor.m31();
+                active.worldZ = anchor.m32();
+                // 关键：立即写入 emitter.worldTransform，SnowStormParticle.render 每帧读到的
+                // 就是本帧最新锚点（含旋转+平移），无需等下一次 manager tick
+                updateEmitterTransform(active);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -212,5 +265,8 @@ public class WorldEmitterManager {
         public double worldX, worldY, worldZ;
         public double velocityX, velocityY, velocityZ;
         public ParticleEffectDefinition definition;
+        /** 完整锚点矩阵（含旋转），非 null 时优先于 worldX/Y/Z 平移锚点。 */
+        @Nullable
+        public Matrix4f anchorMatrix;
     }
 }

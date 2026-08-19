@@ -5,7 +5,6 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.Particle
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.world.SnowStormParticle;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -124,7 +123,8 @@ public final class BillboardHelper {
                 .color(particle.r, particle.g, particle.b, particle.a)
                 .uv(u, v)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(LightTexture.FULL_BRIGHT)
+                // 光照由调方按 particle_appearance_lighting 组件计算：无组件时传入 FULL_BRIGHT（自发光）
+                .uv2(light)
                 .normal(normal, 0, 1, 0)
                 .endVertex();
     }

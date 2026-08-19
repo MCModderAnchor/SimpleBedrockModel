@@ -1,16 +1,20 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v1.particle.render;
 
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.acceleratedrendering.AcceleratedRenderingCompat;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleDescription;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.ParticleAppearanceBillboard;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.ParticleAppearanceLighting;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 import org.jetbrains.annotations.Nullable;
@@ -61,9 +65,23 @@ public final class ParticleRenderer {
         Matrix4f emitterTransform = emitter.getEmitterTransform();
         boolean localPos = emitter.isLocalPosition();
         boolean localRot = emitter.isLocalRotation();
+        Matrix4f pose = poseStack.last().pose();
+        Matrix3f normal = poseStack.last().normal();
+
+        // 光照：存在 particle_appearance_lighting 组件时按环境光照（传入 light）着色，否则自发光恒满亮度
+        boolean hasLighting = definition.findComponent(ParticleAppearanceLighting.class) != null;
+        int particleLight = hasLighting ? light : LightTexture.FULL_BRIGHT;
 
         for (ParticleInstance particle : particles) {
-            BillboardHelper.renderBillboard(particle, poseStack, consumer, light, mode,
+            Matrix4f effectivePose = (localPos && !particle.fpDetached)
+                    ? new Matrix4f(pose).mul(emitterTransform)
+                    : pose;
+            // 加速渲染：粒子以局部坐标 + beginTransform 提交成 mesh，才与枪体同加速层被模板剔除
+            if (AcceleratedRenderingCompat.isLoaded()
+                    && AcceleratedRenderingCompat.renderParticleBillboard(consumer, particle, effectivePose, normal, particleLight)) {
+                continue;
+            }
+            BillboardHelper.renderBillboard(particle, poseStack, consumer, particleLight, mode,
                     emitterTransform, localPos, localRot, cameraPitch, cameraRoll, cameraRotation);
         }
     }
