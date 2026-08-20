@@ -95,6 +95,8 @@ public final class ParticleRenderer {
             case PARTICLES_ALPHA -> RenderType.entityTranslucent(texture);
             case PARTICLES_BLEND -> RenderType.entityTranslucent(texture);
             case PARTICLES_ADD -> ParticleRenderType.additiveParticle(texture);
+            case ENERGY_SWIRL -> RenderType.energySwirl(texture, 1, 1);
+            case PARTICLES_EMISSIVE -> ParticleRenderType.emissiveParticle(texture);
         };
     }
 }
