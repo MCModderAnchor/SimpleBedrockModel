@@ -52,6 +52,8 @@ public class ParticleDescription {
         PARTICLES_BLEND,
         PARTICLES_OPAQUE,
         PARTICLES_ALPHA,
-        PARTICLES_ADD
+        PARTICLES_ADD,
+        ENERGY_SWIRL,
+        PARTICLES_EMISSIVE
     }
 }

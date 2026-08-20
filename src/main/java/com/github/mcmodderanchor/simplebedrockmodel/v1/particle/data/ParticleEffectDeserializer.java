@@ -64,6 +64,8 @@ public class ParticleEffectDeserializer {
                 case "particles_opaque" -> ParticleDescription.Material.PARTICLES_OPAQUE;
                 case "particles_alpha" -> ParticleDescription.Material.PARTICLES_ALPHA;
                 case "particles_add" -> ParticleDescription.Material.PARTICLES_ADD;
+                case "energy_swirl" -> ParticleDescription.Material.ENERGY_SWIRL;
+                case "particles_emissive" -> ParticleDescription.Material.PARTICLES_EMISSIVE;
                 default -> ParticleDescription.Material.PARTICLES_BLEND;
             };
             String texRaw = getString(renderParams, "texture", "textures/particle/generic_0");

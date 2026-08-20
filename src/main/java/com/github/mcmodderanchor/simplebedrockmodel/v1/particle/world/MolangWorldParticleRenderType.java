@@ -77,6 +77,11 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
                 RenderSystem.enableBlend();
                 RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
             }
+            case ENERGY_SWIRL, PARTICLES_EMISSIVE -> {
+                RenderSystem.depthMask(false);
+                RenderSystem.enableBlend();
+                RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
+            }
         }
 
         RenderSystem.disableCull();
