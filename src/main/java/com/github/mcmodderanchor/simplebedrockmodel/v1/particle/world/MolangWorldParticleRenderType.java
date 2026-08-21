@@ -91,6 +91,11 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
     @Override
     public void end(Tesselator tesselator) {
         tesselator.end();
+        RenderSystem.enableCull();
+        RenderSystem.depthMask(true);
+        RenderSystem.disableBlend();
+        RenderSystem.defaultBlendFunc();
+        Minecraft.getInstance().gameRenderer.lightTexture().turnOffLightLayer();
     }
 
     @Override
