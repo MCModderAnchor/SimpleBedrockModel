@@ -8,8 +8,8 @@ import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEnti
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
@@ -81,14 +81,13 @@ final class AcceleratedParticleRenderer {
 
     private void vertex(VertexConsumer consumer, float x, float y, float z,
                         float u, float v, ParticleInstance particle, int light, int overlay) {
-        consumer.vertex(x, y, z)
-                .color(particle.r, particle.g, particle.b, particle.a)
-                .uv(u, v)
-                .overlayCoords(overlay)
+        consumer.addVertex(x, y, z)
+                .setColor(particle.r, particle.g, particle.b, particle.a)
+                .setUv(u, v)
+                .setOverlay(overlay)
                 // 光照由调方按 particle_appearance_lighting 组件计算：无组件时传入 FULL_BRIGHT（自发光）
-                .uv2(light)
-                .normal(0f, 1f, 0f)
-                .endVertex();
+                .setLight(light)
+                .setNormal(0f, 1f, 0f);
     }
 
     private IAcceleratedVertexConsumer getExtension(VertexConsumer consumer) {
