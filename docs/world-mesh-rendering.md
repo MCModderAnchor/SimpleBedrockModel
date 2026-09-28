@@ -1,6 +1,10 @@
 # 世界网格渲染组：分工、API 与策略覆盖
 
-更新日期：2026-09-24。本文描述当前渲染组接口。
+更新日期：2026-09-28。本文描述 NeoForge 1.21.1 的当前渲染组接口。
+
+1.21.1 使用 `VertexConsumer.addVertex/setColor/setUv/setOverlay/setLight/setNormal`，不再调用 `endVertex()`。
+收集器在切换 buffer 或生成 snapshot 时提交尚未结束的链式顶点，保持同材质多次捕获的顶点顺序。
+上传使用 `ByteBufferBuilder + MeshData` 和 `SectionRenderDispatcher.uploadSectionLayer`；底层内存保留到上传完成，并在成功或失败后释放。
 
 ## 分工
 
@@ -188,7 +192,7 @@ strategy = "AUTO" # AUTO / INSTANCE / SECTION
 对象有效性判断由绑定回调提供，渲染组负责遍历和淘汰；无需调用方另建观察表。动态效果或压测计时器仍属于业务对象的行为。
 示例压测的对象和计时器现在也不会因资源重载、手动清缓存或开关世界网格绘制层而被删除。
 
-GPU 上传仍经由原版 ChunkRenderDispatcher。已排队的缓冲在完成前不会被复用，旧代上传完成后不会回流到新代池。
+GPU 上传仍经由原版 SectionRenderDispatcher。已排队的缓冲在完成前不会被复用，旧代上传完成后不会回流到新代池。
 尚未增加主动取消原版排队上传的机制，旧调度器不再 drain 时的及时释放仍是已知边界。
 
 ## 库内部结构
@@ -224,8 +228,8 @@ ShardHandle、MeshLighting 和原始 submit 是内部实现。共享计数由几
 INSTANCE／MUTABLE 是内部提交语义，公共策略为 INSTANCE／SECTION；固定 UV2 布局由捕获结果自动选择。
 
 frameMs 是最多 120 次世界绘制阶段间隔均值，cpuUs 是本层 CPU 时间，不是 GPU 计时。
-局部上传和压力计时的具体判读见 [Section 与光照压测](D:/Minecraft/Dev/SimpleBedrockModel/docs/world-mesh-section-prototype.md)。
-第三人称入口的后续设计见 [物品 VBO 设计](D:/Minecraft/Dev/SimpleBedrockModel/docs/third-person-item-vbo-design.md)。
+局部上传和压力计时的具体判读见 [Section 与光照压测](D:/Minecraft/Dev/MCModderAnchor/SBM-1.21.1/docs/world-mesh-section-prototype.md)。
+第三人称入口的后续设计见 [物品 VBO 设计](D:/Minecraft/Dev/MCModderAnchor/SBM-1.21.1/docs/third-person-item-vbo-design.md)。
 验证采用编译检查与游戏内对照，不新增单元测试。
 
-完整执行顺序、冷路径／稳态差异和资源归属见 [静态渲染调用链](D:/Minecraft/Dev/SimpleBedrockModel/docs/world-mesh-call-chain.md)。
+完整执行顺序、冷路径／稳态差异和资源归属见 [静态渲染调用链](D:/Minecraft/Dev/MCModderAnchor/SBM-1.21.1/docs/world-mesh-call-chain.md)。

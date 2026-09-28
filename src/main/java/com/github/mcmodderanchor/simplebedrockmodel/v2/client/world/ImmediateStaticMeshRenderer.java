@@ -4,8 +4,7 @@ import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -13,12 +12,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
-import net.minecraft.client.renderer.chunk.ChunkRenderDispatcher;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.level.LevelEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.joml.Matrix4f;
 import org.joml.Matrix3f;
 import org.joml.Vector3f;
@@ -38,7 +37,7 @@ import java.util.concurrent.CompletableFuture;
  * the caller supplies the current pose, light and overlay. All entry points run on the render thread.
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT)
 public class ImmediateStaticMeshRenderer {
     public enum DrawResult { DRAWN, PENDING, UNSUPPORTED }
 
@@ -168,7 +167,7 @@ public class ImmediateStaticMeshRenderer {
     }
 
     private static boolean capture(Entry entry, Object key, GeometryProvider provider) {
-        ChunkRenderDispatcher dispatcher = Minecraft.getInstance().levelRenderer.getChunkRenderDispatcher();
+        SectionRenderDispatcher dispatcher = Minecraft.getInstance().levelRenderer.getSectionRenderDispatcher();
         if (dispatcher == null) return false;
         GeometryCollector collector = new GeometryCollector();
         List<Part> parts = new ArrayList<>();
@@ -195,16 +194,15 @@ public class ImmediateStaticMeshRenderer {
                     return false;
                 }
                 VertexBuffer buffer = POOL.acquire(mesh.format());
-                BufferBuilder builder = new BufferBuilder(Math.max(1536, mesh.estimatedBytes() / 6 + 64));
-                builder.begin(mesh.mode(), mesh.format());
-                mesh.emitTo(builder);
-                BufferBuilder.RenderedBuffer rendered = builder.endOrDiscardIfEmpty();
-                if (rendered == null) {
-                    POOL.recycle(mesh.format(), buffer);
-                    continue;
+                CompletableFuture<Void> upload;
+                try {
+                    upload = MeshUpload.submit(mesh, data -> dispatcher.uploadSectionLayer(data, buffer));
+                } catch (RuntimeException | Error exception) {
+                    buffer.close();
+                    throw exception;
                 }
                 parts.add(new Part(buffer, mesh.format(), pass.getKey().material(),
-                        dispatcher.uploadChunkLayer(rendered, buffer), dynamic));
+                        upload, dynamic));
                 bytes += mesh.estimatedBytes();
             }
             if (parts.isEmpty()) return false;
@@ -223,8 +221,8 @@ public class ImmediateStaticMeshRenderer {
     private static boolean layoutSupported(Entry entry) {
         for (Part part : entry.parts) {
             VertexFormat format = part.buffer.getFormat();
-            if (format == null || attributeIndex(format, DefaultVertexFormat.ELEMENT_UV1) < 0
-                    || attributeIndex(format, DefaultVertexFormat.ELEMENT_UV2) < 0) return false;
+            if (format == null || attributeIndex(format, VertexFormatElement.UV1) < 0
+                    || attributeIndex(format, VertexFormatElement.UV2) < 0) return false;
         }
         return true;
     }
@@ -246,8 +244,8 @@ public class ImmediateStaticMeshRenderer {
                 uploadItemLighting(shader, pose);
                 part.buffer.bind();
                 VertexFormat format = part.buffer.getFormat();
-                int overlayIndex = attributeIndex(format, DefaultVertexFormat.ELEMENT_UV1);
-                int lightIndex = attributeIndex(format, DefaultVertexFormat.ELEMENT_UV2);
+                int overlayIndex = attributeIndex(format, VertexFormatElement.UV1);
+                int lightIndex = attributeIndex(format, VertexFormatElement.UV2);
                 GlStateManager._disableVertexAttribArray(overlayIndex);
                 GL30.glVertexAttribI2i(overlayIndex, packedOverlay & 0xFFFF, packedOverlay >>> 16);
                 if (part.instanceLight) {

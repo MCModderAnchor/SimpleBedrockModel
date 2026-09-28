@@ -123,7 +123,7 @@ active 和 pending 各自持有范围映射，只有模型、贴图、朝向、�
 
 本次验证采用 Java 编译检查；游戏内兼容性、观感与性能数据需要实机 A/B。
 
-完整 API 与命令说明见 [世界网格渲染组接口](D:/Minecraft/Dev/SimpleBedrockModel/docs/world-mesh-rendering.md)。
+完整 API 与命令说明见 [世界网格渲染组接口](D:/Minecraft/Dev/MCModderAnchor/SBM-1.21.1/docs/world-mesh-rendering.md)。
 
 默认策略由创建 WorldMeshGroup 的调用方指定。`/sbmrender strategy auto|instance|section` 直接修改用户配置中的策略；
 `/sbmmesh path` 是示例侧的同义入口。`/sbmrender groups` 可查看默认值、实际策略与选择来源。

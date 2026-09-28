@@ -5,7 +5,8 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.client.config.WorldMeshCo
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
@@ -14,17 +15,17 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
-import net.minecraft.client.renderer.chunk.ChunkRenderDispatcher;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.event.level.LevelEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
@@ -48,7 +49,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * 世界空间网格绘制的库侧入口（原型）。
  *
- * <p>职责：VBO 池化与复用、上传提交（转交 {@link ChunkRenderDispatcher#uploadChunkLayer}）、
+ * <p>职责：VBO 池化与复用、上传提交（转交 {@link SectionRenderDispatcher#uploadSectionLayer}）、
  * 单一 {@link RenderLevelStageEvent} 监听与统一绘制。{@link WorldMeshGroup} 管理对象、缓存、策略和失效，
  * 调用方只提供几何描述与对象状态。底层句柄和上传入口不作为公共 API。</p>
  *
@@ -56,13 +57,8 @@ import java.util.concurrent.CompletableFuture;
  * 不受 Embeddium 替换地形管线影响，也不在 Iris/Oculus 的 shadow pass 中触发。</p>
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT)
 public class WorldMeshRenderer {
-    private static final int MAX_SAMPLERS = 12;
-
-    /** 光照的 attribute 位置：{@code VertexFormat} 元素列表序号（NEW_ENTITY 里是 UV2）。 */
-    private static final int LIGHT_ATTRIBUTE_INDEX = 4;
-
     /**
      * 世界空间光源方向，取自 {@code com.mojang.blaze3d.platform.Lighting}（那边是 private 常量）。
      * 静态网格的法线按世界朝向烘焙，所以必须用世界方向，不能复用 {@link RenderSystem#setupShaderLights}。
@@ -201,7 +197,7 @@ public class WorldMeshRenderer {
         if (mesh.isEmpty() || !ensureLevel()) {
             return null;
         }
-        ChunkRenderDispatcher dispatcher = Minecraft.getInstance().levelRenderer.getChunkRenderDispatcher();
+        SectionRenderDispatcher dispatcher = Minecraft.getInstance().levelRenderer.getSectionRenderDispatcher();
         if (dispatcher == null) {
             return null;
         }
@@ -209,13 +205,12 @@ public class WorldMeshRenderer {
         ShardHandle.LightMode lightMode = MeshLighting.classify(mesh, lighting);
 
         VertexBuffer buffer = POOL.acquire(mesh.format());
-        BufferBuilder builder = new BufferBuilder(Math.max(1536, mesh.estimatedBytes() / 6 + 64));
-        builder.begin(mesh.mode(), mesh.format());
-        mesh.emitTo(builder);
-        BufferBuilder.RenderedBuffer rendered = builder.endOrDiscardIfEmpty();
-        if (rendered == null) {
-            POOL.recycle(mesh.format(), buffer);
-            return null;
+        CompletableFuture<Void> upload;
+        try {
+            upload = MeshUpload.submit(mesh, data -> dispatcher.uploadSectionLayer(data, buffer));
+        } catch (RuntimeException | Error exception) {
+            buffer.close();
+            throw exception;
         }
 
         int lightBufferId = -1;
@@ -227,7 +222,7 @@ public class WorldMeshRenderer {
         }
 
         ShardHandle handle = new ShardHandle(owner.id(), buffer, mesh.format(),
-                material, mesh.bounds(), generation, dispatcher.uploadChunkLayer(rendered, buffer),
+                material, mesh.bounds(), generation, upload,
                 lightBufferId, lightScratch, lightMode);
         SHARDS.add(handle);
         METRICS.recordSubmit(lightMode);
@@ -291,18 +286,17 @@ public class WorldMeshRenderer {
      * stride 与偏移都会变。</p>
      */
     private static int findLightOffset(VertexFormat format) {
-        int offset = 0;
-        for (VertexFormatElement element : format.getElements()) {
-            if (element == DefaultVertexFormat.ELEMENT_UV2) {
-                return offset;
-            }
-            offset += element.getByteSize();
-        }
-        return -1;
+        return format.getOffset(VertexFormatElement.UV2);
+    }
+
+    private static int lightAttributeIndex(@Nullable VertexFormat format) {
+        return format == null ? -1 : format.getElements().indexOf(VertexFormatElement.UV2);
     }
 
     /** 几何 VAO 绑定后设置 UV2 来源；上传和池复用后的首次绘制必须重新设置。 */
     private static boolean attachLightStream(ShardHandle handle) {
+        int lightAttributeIndex = lightAttributeIndex(handle.buffer().getFormat());
+        if (lightAttributeIndex < 0) return false;
         int geometryBuffer = handle.buffer().vertexBufferId;
         int target;
         int stride;
@@ -320,8 +314,8 @@ public class WorldMeshRenderer {
             stride = format.getVertexSize();
         }
         GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER, target);
-        GlStateManager._enableVertexAttribArray(LIGHT_ATTRIBUTE_INDEX);
-        GlStateManager._vertexAttribIPointer(LIGHT_ATTRIBUTE_INDEX, 2, GL11.GL_SHORT, stride, offset);
+        GlStateManager._enableVertexAttribArray(lightAttributeIndex);
+        GlStateManager._vertexAttribIPointer(lightAttributeIndex, 2, GL11.GL_SHORT, stride, offset);
         GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER, geometryBuffer);
         handle.markLightStreamAttached();
         return true;
@@ -357,19 +351,15 @@ public class WorldMeshRenderer {
 
     /** 用最小代价问一次"当前生效的顶点格式"：构造 1 个 quad 再丢弃，不碰 GL。 */
     public static VertexFormat probeFormat() {
-        BufferBuilder probe = new BufferBuilder(1024);
-        probe.begin(VertexFormat.Mode.QUADS, MeshSink.FORMAT);
-        for (int i = 0; i < 4; i++) {
-            probe.vertex(0.0, 0.0, 0.0).color(255, 255, 255, 255).uv(0.0F, 0.0F)
-                    .overlayCoords(0).uv2(0).normal(0.0F, 1.0F, 0.0F).endVertex();
+        try (ByteBufferBuilder storage = new ByteBufferBuilder(1024)) {
+            BufferBuilder probe = new BufferBuilder(storage, VertexFormat.Mode.QUADS, MeshSink.FORMAT);
+            for (int i = 0; i < 4; i++) {
+                probe.addVertex(0.0F, 0.0F, 0.0F, -1, 0.0F, 0.0F, 0, 0, 0.0F, 1.0F, 0.0F);
+            }
+            try (MeshData rendered = probe.buildOrThrow()) {
+                return rendered.drawState().format();
+            }
         }
-        BufferBuilder.RenderedBuffer rendered = probe.endOrDiscardIfEmpty();
-        if (rendered == null) {
-            return null;
-        }
-        VertexFormat format = rendered.drawState().format();
-        rendered.release();
-        return format;
     }
 
     static void release(ShardHandle handle) {
@@ -410,8 +400,8 @@ public class WorldMeshRenderer {
     static long stateUpdateTick() { return stateUpdateTick; }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (!MESH_GROUPS.isEmpty() && event.phase == TickEvent.Phase.END) stateUpdateTick++;
+    public static void onClientTick(ClientTickEvent.Post event) {
+        if (!MESH_GROUPS.isEmpty()) stateUpdateTick++;
     }
 
     @SubscribeEvent
@@ -523,7 +513,7 @@ public class WorldMeshRenderer {
         Camera camera = event.getCamera();
         Vec3 cameraPosition = camera.getPosition();
         Frustum frustum = event.getFrustum();
-        Matrix4f baseView = event.getPoseStack().last().pose();
+        Matrix4f baseView = event.getModelViewMatrix();
         Matrix4f projection = event.getProjectionMatrix();
 
         collectedCount = 0;
@@ -612,10 +602,15 @@ public class WorldMeshRenderer {
 
                     handle.buffer().bind();
                     if (handle.lightMode() == ShardHandle.LightMode.UNIFORM) {
+                        int lightAttributeIndex = lightAttributeIndex(handle.buffer().getFormat());
+                        if (lightAttributeIndex < 0) {
+                            index = end;
+                            continue;
+                        }
                         // 全动态：整个 draw 是同一个光照值 → 关掉 attribute 数组、给整型常量属性。
                         // 数组启用位属于 VAO，常量属性值属于上下文；每个光照组都要设置。
-                        GlStateManager._disableVertexAttribArray(LIGHT_ATTRIBUTE_INDEX);
-                        GL30.glVertexAttribI2i(LIGHT_ATTRIBUTE_INDEX,
+                        GlStateManager._disableVertexAttribArray(lightAttributeIndex);
+                        GL30.glVertexAttribI2i(lightAttributeIndex,
                                 light & 0xFFFF, light >>> 16);
                     } else {
                         if (!handle.isLightStreamAttached() && !attachLightStream(handle)) {
@@ -705,42 +700,8 @@ public class WorldMeshRenderer {
      * 逐 shard 上传 ModelViewMat；局部朝向改变时同步方向光，再 bind、draw。
      */
     public static void uploadSharedUniforms(ShaderInstance shader, Matrix4f baseView, Matrix4f projection) {
-        for (int i = 0; i < MAX_SAMPLERS; i++) {
-            shader.setSampler("Sampler" + i, RenderSystem.getShaderTexture(i));
-        }
-        if (shader.MODEL_VIEW_MATRIX != null) {
-            shader.MODEL_VIEW_MATRIX.set(baseView);
-        }
-        if (shader.PROJECTION_MATRIX != null) {
-            shader.PROJECTION_MATRIX.set(projection);
-        }
-        if (shader.INVERSE_VIEW_ROTATION_MATRIX != null) {
-            shader.INVERSE_VIEW_ROTATION_MATRIX.set(RenderSystem.getInverseViewRotationMatrix());
-        }
-        if (shader.COLOR_MODULATOR != null) {
-            shader.COLOR_MODULATOR.set(RenderSystem.getShaderColor());
-        }
-        if (shader.GLINT_ALPHA != null) {
-            shader.GLINT_ALPHA.set(RenderSystem.getShaderGlintAlpha());
-        }
-        if (shader.FOG_START != null) {
-            shader.FOG_START.set(RenderSystem.getShaderFogStart());
-        }
-        if (shader.FOG_END != null) {
-            shader.FOG_END.set(RenderSystem.getShaderFogEnd());
-        }
-        if (shader.FOG_COLOR != null) {
-            shader.FOG_COLOR.set(RenderSystem.getShaderFogColor());
-        }
-        if (shader.FOG_SHAPE != null) {
-            shader.FOG_SHAPE.set(RenderSystem.getShaderFogShape().getIndex());
-        }
-        if (shader.TEXTURE_MATRIX != null) {
-            shader.TEXTURE_MATRIX.set(RenderSystem.getTextureMatrix());
-        }
-        if (shader.GAME_TIME != null) {
-            shader.GAME_TIME.set(RenderSystem.getShaderGameTime());
-        }
+        // Both supported topologies use the same default uniforms; neither is a line mode.
+        shader.setDefaultUniforms(VertexFormat.Mode.QUADS, baseView, projection, Minecraft.getInstance().getWindow());
 
         boolean constantAmbient = Minecraft.getInstance().level != null
                 && Minecraft.getInstance().level.effects().constantAmbientLight();

@@ -24,12 +24,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +47,7 @@ import java.util.Locale;
  * </ul>
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT)
 public final class ExampleStressMeshGroup {
     public static final String ID = "example:stress";
 
@@ -161,8 +161,8 @@ public final class ExampleStressMeshGroup {
     }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (!registered || event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
+        if (!registered) return;
         Minecraft minecraft = Minecraft.getInstance();
         if (world != minecraft.level) {
             clear();
@@ -273,7 +273,7 @@ public final class ExampleStressMeshGroup {
         // 必须从事件里的 pose stack 起手：它含相机视图旋转，方块实体路径就是这么给顶点的
         // （BufferUploader 用的 ModelViewMat 是世界渲染期的单位阵）。少了这一步，顶点只有相机相对位移、
         // 没有视图旋转，几何会投到错误的屏幕位置。
-        poseStack.mulPoseMatrix(event.getPoseStack().last().pose());
+        poseStack.mulPose(event.getPoseStack().last().pose());
         for (Instance instance : INSTANCES) {
             TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(instance.modelId);
             if (model == null) continue;

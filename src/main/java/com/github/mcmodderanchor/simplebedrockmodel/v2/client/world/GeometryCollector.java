@@ -11,7 +11,9 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -27,11 +29,14 @@ public class GeometryCollector {
         }
     }
     private final Map<Pass, MeshSink> meshes = new LinkedHashMap<>();
+    private final List<LightPassVertexRouter> routers = new ArrayList<>();
 
     public GeometryCollector() {}
 
     /** 单个 pass 的 UV2 须全部为 0 或全部固定非零；混合时使用双材质重载。 */
     public VertexConsumer buffer(RenderType material, VertexFormat.Mode mode) {
+        // Finish the preceding chained write before another consumer appends to the same pass.
+        this.routers.forEach(LightPassVertexRouter::finish);
         return this.meshes.computeIfAbsent(new Pass(material, mode), pass -> new MeshSink().begin(mode));
     }
 
@@ -40,7 +45,9 @@ public class GeometryCollector {
         if (Objects.requireNonNull(ordinary, "ordinary").equals(Objects.requireNonNull(emissive, "emissive"))) {
             throw new IllegalArgumentException("Ordinary and emissive RenderTypes must differ");
         }
-        return new LightPassVertexRouter(buffer(ordinary, mode), buffer(emissive, mode), mode);
+        LightPassVertexRouter router = new LightPassVertexRouter(buffer(ordinary, mode), buffer(emissive, mode), mode);
+        this.routers.add(router);
+        return router;
     }
 
     private record BlockModelKey(ResourceLocation model, ResourceLocation texture, Direction facing) {}
@@ -69,9 +76,13 @@ public class GeometryCollector {
     }
 
     public Map<Pass, MeshSink> snapshot() {
+        this.routers.forEach(LightPassVertexRouter::finish);
         Map<Pass, MeshSink> result = new LinkedHashMap<>();
         this.meshes.forEach((pass, mesh) -> { if (!mesh.isEmpty()) result.put(pass, mesh); });
         return result;
     }
-    public void clear() { this.meshes.clear(); }
+    public void clear() {
+        this.meshes.clear();
+        this.routers.clear();
+    }
 }

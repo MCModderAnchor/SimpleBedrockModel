@@ -10,9 +10,9 @@ public class LightPassVertexRouter implements VertexConsumer {
     private final int primitiveSize;
     private int primitiveVertices;
     private boolean primitiveEmissive;
-    private double x, y, z;
+    private float x, y, z;
+    private boolean pending;
     private int red = 255, green = 255, blue = 255, alpha = 255;
-    private int defaultRed = 255, defaultGreen = 255, defaultBlue = 255, defaultAlpha = 255;
     private float u, v;
     private int overlayU, overlayV, lightU, lightV;
     private float normalX, normalY, normalZ;
@@ -28,43 +28,57 @@ public class LightPassVertexRouter implements VertexConsumer {
     }
 
     @Override
-    public VertexConsumer vertex(double x, double y, double z) {
+    public VertexConsumer addVertex(float x, float y, float z) {
+        flush();
         this.x = x; this.y = y; this.z = z;
+        this.pending = true;
         return this;
     }
 
     @Override
-    public VertexConsumer color(int red, int green, int blue, int alpha) {
+    public VertexConsumer setColor(int red, int green, int blue, int alpha) {
         this.red = red; this.green = green; this.blue = blue; this.alpha = alpha;
         return this;
     }
 
     @Override
-    public VertexConsumer uv(float u, float v) {
+    public VertexConsumer setUv(float u, float v) {
         this.u = u; this.v = v;
         return this;
     }
 
     @Override
-    public VertexConsumer overlayCoords(int u, int v) {
+    public VertexConsumer setUv1(int u, int v) {
         this.overlayU = u; this.overlayV = v;
         return this;
     }
 
     @Override
-    public VertexConsumer uv2(int u, int v) {
+    public VertexConsumer setUv2(int u, int v) {
         this.lightU = u; this.lightV = v;
         return this;
     }
 
     @Override
-    public VertexConsumer normal(float x, float y, float z) {
+    public VertexConsumer setNormal(float x, float y, float z) {
         this.normalX = x; this.normalY = y; this.normalZ = z;
         return this;
     }
 
     @Override
-    public void endVertex() {
+    public void addVertex(float x, float y, float z, int color, float u, float v,
+                          int packedOverlay, int packedLight, float normalX, float normalY, float normalZ) {
+        VertexConsumer.super.addVertex(x, y, z, color, u, v, packedOverlay, packedLight, normalX, normalY, normalZ);
+        flush();
+    }
+
+    /** Submit the last chained vertex before the collector exposes its captured meshes. */
+    public void finish() {
+        flush();
+    }
+
+    private void flush() {
+        if (!this.pending) return;
         boolean fixed = this.lightU != 0 || this.lightV != 0;
         if (this.primitiveVertices == 0) {
             this.primitiveEmissive = fixed;
@@ -73,31 +87,16 @@ public class LightPassVertexRouter implements VertexConsumer {
         }
 
         VertexConsumer target = fixed ? this.emissive : this.ordinary;
-        target.vertex(this.x, this.y, this.z)
-                .color(this.red, this.green, this.blue, this.alpha)
-                .uv(this.u, this.v)
-                .overlayCoords(this.overlayU, this.overlayV)
-                .uv2(this.lightU, this.lightV)
-                .normal(this.normalX, this.normalY, this.normalZ)
-                .endVertex();
+        int color = (this.alpha << 24) | (this.red << 16) | (this.green << 8) | this.blue;
+        target.addVertex(this.x, this.y, this.z, color, this.u, this.v,
+                (this.overlayV << 16) | this.overlayU, (this.lightV << 16) | this.lightU,
+                this.normalX, this.normalY, this.normalZ);
 
+        this.pending = false;
         this.primitiveVertices = (this.primitiveVertices + 1) % this.primitiveSize;
-        this.red = this.defaultRed; this.green = this.defaultGreen;
-        this.blue = this.defaultBlue; this.alpha = this.defaultAlpha;
+        this.red = this.green = this.blue = this.alpha = 255;
         this.u = this.v = 0;
         this.overlayU = this.overlayV = this.lightU = this.lightV = 0;
         this.normalX = this.normalY = this.normalZ = 0;
-    }
-
-    @Override
-    public void defaultColor(int red, int green, int blue, int alpha) {
-        this.defaultRed = this.red = red; this.defaultGreen = this.green = green;
-        this.defaultBlue = this.blue = blue; this.defaultAlpha = this.alpha = alpha;
-    }
-
-    @Override
-    public void unsetDefaultColor() {
-        this.defaultRed = this.red = 255; this.defaultGreen = this.green = 255;
-        this.defaultBlue = this.blue = 255; this.defaultAlpha = this.alpha = 255;
     }
 }

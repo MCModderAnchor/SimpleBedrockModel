@@ -1,6 +1,6 @@
 # 世界网格渲染调用链与资源归属
 
-更新日期：2026-09-24。接入方法见 [渲染组 API](D:/Minecraft/Dev/SimpleBedrockModel/docs/world-mesh-rendering.md)。
+更新日期：2026-09-24。接入方法见 [渲染组 API](D:/Minecraft/Dev/MCModderAnchor/SBM-1.21.1/docs/world-mesh-rendering.md)。
 
 ## 主链
 
@@ -99,7 +99,7 @@ InstanceMeshBatches 为已捕获的几何排队上传。SectionMeshBatches 的 p
 ## 上传与绘制
 
 WorldMeshRenderer.submit 接收内部 MeshSink、材质和光照语义，直接计算包围盒并建立 ShardHandle。
-上传由原版 ChunkRenderDispatcher 队列执行。未完成上传的网格不参与绘制；策略负责等待和换版。
+上传由原版 SectionRenderDispatcher 队列执行。未完成上传的网格不参与绘制；策略负责等待和换版。
 
 绘制阶段按材质共享 shader 参数，逐实例更新 ModelView 矩阵并 draw。
 section 的局部光照更新通过独立流上传脏范围，不改几何缓冲。

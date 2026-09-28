@@ -6,17 +6,17 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshRen
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.StrategyOverride;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterClientCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Locale;
 
 /** 库随包提供的客户端配置快捷入口，与 example 压测命令独立。 */
 @ApiStatus.Internal
-@Mod.EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = SimpleBedrockModel.MOD_ID, value = Dist.CLIENT)
 public final class WorldMeshCommands {
     private WorldMeshCommands() {}
 

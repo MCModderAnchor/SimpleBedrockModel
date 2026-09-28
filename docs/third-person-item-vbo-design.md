@@ -70,7 +70,7 @@ DrawResult tryDraw(Object geometryKey, GeometryProvider provider,
 
 ## 6. 失效、交接和验证
 
-`ClientIndexManager.resourceRevision()` 改变、F3+T 重载、模型／LOD 或贴图替换、顶点格式漂移时，使旧键和相应 VBO 失效。GPU 释放只在渲染线程进行；已排队上传的缓冲在完成后再回收。关闭优化开关应立即让物品走旧路径，并禁止同一调用再次 VBO 绘制。世界切换时清理依赖旧 `ChunkRenderDispatcher` 的排队任务。
+`ClientIndexManager.resourceRevision()` 改变、F3+T 重载、模型／LOD 或贴图替换、顶点格式漂移时，使旧键和相应 VBO 失效。GPU 释放只在渲染线程进行；已排队上传的缓冲在完成后再回收。关闭优化开关应立即让物品走旧路径，并禁止同一调用再次 VBO 绘制。世界切换时清理依赖旧 `SectionRenderDispatcher` 的排队任务。
 
 展示枪原型的 `DisplayGunMeshGroup.tryRender` 当前调用 `claimForWorldDraw` 后直接返回 true。这与“受支持但未就绪时跳过旧绘制”一致：`claim` 的返回值只表示本帧世界层是否已有可画 VBO，不决定是否调用 BER。迁移展示捕获矩阵时应保留这个交接语义，不能把 `claim == false` 误改为旧路径回退。未就绪可能短时不可见，统计中要区分等待、捕获失败和上传失败。
 
@@ -81,4 +81,4 @@ DrawResult tryDraw(Object geometryKey, GeometryProvider provider,
 3. 在 TACZ 接入第三人称右手和 `GROUND`，完成定位矩阵、LOD、未就绪跳过与明确不支持时的旧路径；检查资源重载和 GPU 回收。
 4. 验证原版、Embeddium、Oculus 主场景／阴影 pass 与 AR 环境。已验证可用的光影组合默认尝试 VBO，AR 的优先级低于 VBO。
 
-游戏内对照应覆盖近远 LOD、手持运动、掉落物旋转、非均匀缩放、明暗变化、满亮、自带／安装配件、满空弹、overlay、资源重载及从未就绪到就绪的过渡。性能记录捕获次数、上传字节、VBO 数和显存、draw 数、CPU 绘制时间及帧时间波动；共享 VBO 避免逐帧重建顶点，但不同物品仍各自发起 draw，不等同于硬件实例化。现有 [世界网格文档](D:/Minecraft/Dev/SimpleBedrockModel/docs/world-mesh-rendering.md) 的 `cpuUs` 是 CPU 计时，不是 GPU 计时。
+游戏内对照应覆盖近远 LOD、手持运动、掉落物旋转、非均匀缩放、明暗变化、满亮、自带／安装配件、满空弹、overlay、资源重载及从未就绪到就绪的过渡。性能记录捕获次数、上传字节、VBO 数和显存、draw 数、CPU 绘制时间及帧时间波动；共享 VBO 避免逐帧重建顶点，但不同物品仍各自发起 draw，不等同于硬件实例化。现有 [世界网格文档](D:/Minecraft/Dev/MCModderAnchor/SBM-1.21.1/docs/world-mesh-rendering.md) 的 `cpuUs` 是 CPU 计时，不是 GPU 计时。

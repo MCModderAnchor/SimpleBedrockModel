@@ -4,8 +4,8 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -152,13 +152,9 @@ public class MeshSink implements VertexConsumer {
         for (int i = 0; i < this.vertexCount; i++) {
             int p = i * 3;
             int t = i * 2;
-            out.vertex(this.positions[p] + x, this.positions[p + 1] + y, this.positions[p + 2] + z)
-                    .color(this.colors[i])
-                    .uv(this.uvs[t], this.uvs[t + 1])
-                    .overlayCoords(this.overlays[i])
-                    .uv2(this.lights[i])
-                    .normal(this.normals[p], this.normals[p + 1], this.normals[p + 2])
-                    .endVertex();
+            out.addVertex((float) (this.positions[p] + x), (float) (this.positions[p + 1] + y),
+                    (float) (this.positions[p + 2] + z), this.colors[i], this.uvs[t], this.uvs[t + 1],
+                    this.overlays[i], this.lights[i], this.normals[p], this.normals[p + 1], this.normals[p + 2]);
         }
     }
 
@@ -181,69 +177,53 @@ public class MeshSink implements VertexConsumer {
             position.set(this.positions[p], this.positions[p + 1], this.positions[p + 2]).mulPosition(transform);
             normal.set(this.normals[p], this.normals[p + 1], this.normals[p + 2]).mul(normalMatrix);
             if (normal.lengthSquared() > 1.0E-12F) normal.normalize();
-            out.vertex(position.x + x, position.y + y, position.z + z)
-                    .color(this.colors[i]).uv(this.uvs[t], this.uvs[t + 1])
-                    .overlayCoords(this.overlays[i]).uv2(this.lights[i])
-                    .normal(normal.x, normal.y, normal.z).endVertex();
+            out.addVertex((float) (position.x + x), (float) (position.y + y), (float) (position.z + z),
+                    this.colors[i], this.uvs[t], this.uvs[t + 1], this.overlays[i], this.lights[i],
+                    normal.x, normal.y, normal.z);
         }
     }
 
     @Override
-    public VertexConsumer vertex(double px, double py, double pz) {
+    public VertexConsumer addVertex(float px, float py, float pz) {
         this.flush();
-        this.x = (float) px;
-        this.y = (float) py;
-        this.z = (float) pz;
+        this.x = px;
+        this.y = py;
+        this.z = pz;
         this.pending = true;
         return this;
     }
 
     @Override
-    public VertexConsumer color(int red, int green, int blue, int alpha) {
+    public VertexConsumer setColor(int red, int green, int blue, int alpha) {
         this.color = (alpha << 24) | (red << 16) | (green << 8) | blue;
         return this;
     }
 
     @Override
-    public VertexConsumer uv(float pu, float pv) {
+    public VertexConsumer setUv(float pu, float pv) {
         this.u = pu;
         this.v = pv;
         return this;
     }
 
     @Override
-    public VertexConsumer overlayCoords(int pu, int pv) {
+    public VertexConsumer setUv1(int pu, int pv) {
         this.overlay = (pv << 16) | pu;
         return this;
     }
 
     @Override
-    public VertexConsumer uv2(int pu, int pv) {
+    public VertexConsumer setUv2(int pu, int pv) {
         this.light = (pv << 16) | pu;
         return this;
     }
 
     @Override
-    public VertexConsumer normal(float pnx, float pny, float pnz) {
+    public VertexConsumer setNormal(float pnx, float pny, float pnz) {
         this.nx = pnx;
         this.ny = pny;
         this.nz = pnz;
         return this;
-    }
-
-    @Override
-    public void endVertex() {
-        this.flush();
-    }
-
-    @Override
-    public void defaultColor(int red, int green, int blue, int alpha) {
-        this.color(red, green, blue, alpha);
-    }
-
-    @Override
-    public void unsetDefaultColor() {
-        this.color = -1;
     }
 
     private void flush() {
