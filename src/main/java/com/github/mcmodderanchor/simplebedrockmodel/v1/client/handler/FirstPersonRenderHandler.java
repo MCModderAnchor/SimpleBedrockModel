@@ -81,6 +81,7 @@ public class FirstPersonRenderHandler {
     private static boolean mainOccupiedOffhand = false;
 
     private static boolean forceHandSwapFlag = false;
+    private static boolean wasFirstPerson = true;
 
     private static HandRenderState stateFor(InteractionHand hand) {
         return hand == InteractionHand.OFF_HAND ? OFF_STATE : MAIN_STATE;
@@ -99,6 +100,7 @@ public class FirstPersonRenderHandler {
         realSelectedSlot = -1;
         forceHandSwapFlag = false;
         mainOccupiedOffhand = false;
+        wasFirstPerson = true;
         MAIN_STATE.reset();
         OFF_STATE.reset();
         PARTICLE_SYSTEM.clear();
@@ -120,6 +122,14 @@ public class FirstPersonRenderHandler {
         if (player == null) {
             return;
         }
+
+        boolean isFirstPerson = Minecraft.getInstance().options.getCameraType().isFirstPerson();
+        if (wasFirstPerson && !isFirstPerson) {
+            // 离开第一人称后不再有 RenderHandEvent 更新定位器；保留 loop emitter 会以最后
+            // 一帧手部变换持续发射，故立即废弃本地载体。
+            PARTICLE_SYSTEM.discardEmitters();
+        }
+        wasFirstPerson = isFirstPerson;
 
         int newSlot = player.getInventory().selected;
         ItemStack newMain = player.getMainHandItem();
@@ -166,8 +176,8 @@ public class FirstPersonRenderHandler {
             // 主手霸占副手视野：丢弃副手实例（不可见，收枪动画无意义），且不掏新枪。
             if (occupyFlip) {
                 discardOffhandInstance();
-                // 副手被遮挡：停止副手发射器，不再产出新粒子（已生成粒子继续消亡）。
-                PARTICLE_SYSTEM.stopEmitters(InteractionHand.OFF_HAND);
+                // 副手被遮挡后没有可用的模型渲染基准，不能保留附着型本地粒子。
+                PARTICLE_SYSTEM.discardEmitters(InteractionHand.OFF_HAND);
             }
         } else if (occupyFlip) {
             // 霸占刚解除：副手按当前物品全新掏枪（可见的掏枪动画）。
@@ -230,8 +240,8 @@ public class FirstPersonRenderHandler {
 
         // 幂等保护：当前活跃 instance 已代表「同一持有物 + 同一渲染变体」时不重复切换，
         // 避免「物品变化」与「变体变化」在同一目标上重复触发，导致连续掏两次。
-        // force=true（如 swap 对调两把同 id 枪）时穿透此短路，强制重建。
         if (!force
+                && !newStack.isEmpty()
                 && state.activeInstance != null
                 && isSameItemStacks(state.activeInstance.currentItem(), newStack)
                 && java.util.Objects.equals(state.variantKey, newVariantKey)) {
@@ -239,9 +249,6 @@ public class FirstPersonRenderHandler {
         }
 
         boolean oldIsCustom = state.activeInstance != null;
-
-        // 切换物品时停止该手旧发射器（已生成粒子继续按生命周期消亡）。
-        PARTICLE_SYSTEM.stopEmitters(hand);
 
         state.previousInstance = state.activeInstance;
         state.activeInstance = createInstance(newStack, hand);
@@ -252,6 +259,11 @@ public class FirstPersonRenderHandler {
             state.switchStartTime = CLOCK.nowMillis();
             state.currentSheatheDuration = calculateSheatheDuration(state.previousInstance.currentItem());
             state.previousInstance.triggerPutAway();
+            // 零时长收枪没有后续动画帧可供 tickStates 收尾（直接丢弃物品也常走此处），
+            // 必须在当前 tick 完成切换，否则旧 loop emitter 会继续使用最后的手部变换。
+            if (state.currentSheatheDuration <= 0L) {
+                finishTransition(state, hand);
+            }
         } else {
             state.transitioning = false;
         }
@@ -259,13 +271,23 @@ public class FirstPersonRenderHandler {
 
     private static void tickStates(HandRenderState state, InteractionHand hand) {
         if (state.transitioning && getSheatheProgress(state) >= 1.0f) {
-            state.transitioning = false;
-            // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget），
-            // 并按当前形态记录变体键。
-            state.activeInstance = createInstance(state.realItem, hand);
-            state.variantKey = getRenderVariantKey(state.realItem, hand);
-            state.previousInstance = null;
+            finishTransition(state, hand);
         }
+    }
+
+    /**
+     * 结束收枪过渡。该路径也用于零时长收枪，确保直接丢弃物品不依赖下一帧状态 tick。
+     */
+    private static void finishTransition(HandRenderState state, InteractionHand hand) {
+        // previousInstance 不再渲染，局部粒子也失去正确的模型空间基准。此前收枪动画
+        // 仍可正常触发粒子；现在才废弃旧 emitter，避免它们在下一件物品上错位渲染。
+        PARTICLE_SYSTEM.discardEmitters(hand);
+        state.transitioning = false;
+        // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget），
+        // 并按当前形态记录变体键。
+        state.activeInstance = createInstance(state.realItem, hand);
+        state.variantKey = getRenderVariantKey(state.realItem, hand);
+        state.previousInstance = null;
     }
 
     /**

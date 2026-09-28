@@ -58,6 +58,8 @@ public class FirstPersonParticleSystem {
      * 添加一个粒子效果发射器并标记其归属手。
      * <p>
      * 发射器产出的世界空间粒子会自动投递到原版 ParticleEngine，
+     * 并默认启用第一人称 FOV 补偿；调用方可通过
+     * {@link ParticleEmitterInstance#setFovCompensatedWorldParticles(boolean)} 关闭。
      * 局部空间粒子留在内部列表由本系统管理。归属手仅用于 {@link #stopEmitters(InteractionHand)}
      * 按手停止产出，不影响 tick / render（两手统一处理）。
      *
@@ -65,6 +67,7 @@ public class FirstPersonParticleSystem {
      */
     public ParticleEmitterInstance addEmitter(ParticleEffectDefinition definition, InteractionHand hand) {
         ParticleEmitterInstance emitter = new ParticleEmitterInstance(definition, molang);
+        emitter.setFovCompensatedWorldParticles(true);
 
         // 启用第一人称模式（检查 sbm:fp_emitter_local_space 组件）
         emitter.enableFPMode();
@@ -208,8 +211,7 @@ public class FirstPersonParticleSystem {
      * 移除所有发射器和粒子。
      */
     public void clear() {
-        mainEmitters.clear();
-        offEmitters.clear();
+        discardEmitters();
         hasPrevCam = false;
     }
 
@@ -221,6 +223,28 @@ public class FirstPersonParticleSystem {
         for (ParticleEmitterInstance emitter : emittersFor(hand)) {
             emitter.setRemoved(true);
         }
+    }
+
+    /**
+     * 立即废弃指定手的发射器及局部空间粒子。
+     * <p>
+     * 用于该手的第一人称模型不再有可用渲染基准的场景，例如收枪结束、物品被遮挡或
+     * 切换到第三人称。已投递到原版 ParticleEngine 的世界空间粒子不会受影响。
+     */
+    public void discardEmitters(InteractionHand hand) {
+        List<ParticleEmitterInstance> emitters = emittersFor(hand);
+        for (ParticleEmitterInstance emitter : emitters) {
+            emitter.discard();
+        }
+        emitters.clear();
+    }
+
+    /**
+     * 立即废弃主手和副手的全部第一人称发射器。
+     */
+    public void discardEmitters() {
+        discardEmitters(InteractionHand.MAIN_HAND);
+        discardEmitters(InteractionHand.OFF_HAND);
     }
 
     /**

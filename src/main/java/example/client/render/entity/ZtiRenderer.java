@@ -5,8 +5,6 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockMo
 import com.github.mcmodderanchor.simplebedrockmodel.v1.common.resource.pojo.BedrockAnimationFile;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.BakedModelInstance;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedBoneDefinition;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import com.google.common.base.Suppliers;
@@ -56,13 +54,9 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
         // 使用 v2 模型的骨骼索引初始化动画，替代 v1 的 RegisterBedrockAnimationReloadListenerEvent 流程
         ZtiAnimationContext.initialize(animationFile, model);
 
-        SimpleBedrockModel.LOGGER.info("Loaded v2 ZTI model: bones={}, cubeChunks={}, meshChunks={}",
+        SimpleBedrockModel.LOGGER.debug("Loaded v2 ZTI model: bones={}, cubeChunks={}, meshChunks={}",
                 model.bones().length, model.cubeChunks().length, model.meshChunks().length);
 
-        // 调试日志：打印骨骼层级与几何体分布
-        logBoneHierarchy(model);
-        // 调试日志：打印 mesh chunk 的顶点包围盒
-        logMeshChunkBounds(model);
         return model;
     }
 
@@ -99,51 +93,4 @@ public class ZtiRenderer extends EntityRenderer<Zti> {
         return TEXTURE;
     }
 
-    private static void logBoneHierarchy(BakedBedrockModel model) {
-        SimpleBedrockModel.LOGGER.info("=== ZTI v2 bone hierarchy ({}) ===", model.bones().length);
-        for (BakedBoneDefinition bone : model.bones()) {
-            boolean hasQuads = false;
-            boolean hasVerts = false;
-            for (BakedGeometryChunk chunk : model.cubeChunks()) {
-                if (chunk.attachBoneIndex() == bone.index()) { hasQuads = true; break; }
-            }
-            for (BakedGeometryChunk chunk : model.meshChunks()) {
-                if (chunk.attachBoneIndex() == bone.index()) { hasVerts = true; break; }
-            }
-            SimpleBedrockModel.LOGGER.info(String.format(
-                    "  [%d] %s  parent=%d  pivot=(%.3f, %.3f, %.3f)  bindRot=(%.1f, %.1f, %.1f)  bindLocal=%s  hasQuads=%s hasVerts=%s",
-                    bone.index(), bone.name(), bone.parentIndex(),
-                    bone.pivotX(), bone.pivotY(), bone.pivotZ(),
-                    Math.toDegrees(bone.bindEulerRotation().x()),
-                    Math.toDegrees(bone.bindEulerRotation().y()),
-                    Math.toDegrees(bone.bindEulerRotation().z()),
-                    bone.bindLocalTransform() != null ? "non-null" : "NULL",
-                    hasQuads, hasVerts));
-        }
-    }
-
-    private static void logMeshChunkBounds(BakedBedrockModel model) {
-        for (BakedGeometryChunk chunk : model.meshChunks()) {
-            if (!chunk.hasVertices()) continue;
-            float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
-            float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
-            float[] pos = chunk.vertices().positions();
-            for (int v = 0; v < chunk.vertices().vertexCount(); v++) {
-                float vx = pos[v * 3];
-                float vy = pos[v * 3 + 1];
-                float vz = pos[v * 3 + 2];
-                if (vx < minX) minX = vx;
-                if (vy < minY) minY = vy;
-                if (vz < minZ) minZ = vz;
-                if (vx > maxX) maxX = vx;
-                if (vy > maxY) maxY = vy;
-                if (vz > maxZ) maxZ = vz;
-            }
-            BakedBoneDefinition bone = model.bones()[chunk.attachBoneIndex()];
-            SimpleBedrockModel.LOGGER.info(String.format(
-                    "  Mesh chunk on bone [%d] %s: %d vertices, bounds=(%.3f,%.3f,%.3f) -> (%.3f,%.3f,%.3f)",
-                    bone.index(), bone.name(), chunk.vertices().vertexCount(),
-                    minX, minY, minZ, maxX, maxY, maxZ));
-        }
-    }
 }

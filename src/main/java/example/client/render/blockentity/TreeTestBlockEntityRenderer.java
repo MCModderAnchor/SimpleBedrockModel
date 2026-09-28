@@ -6,7 +6,6 @@ import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.Tree
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
-import com.google.common.base.Suppliers;
 import com.maydaymemory.mae.basic.ArrayPoseBuilder;
 import com.maydaymemory.mae.basic.Pose;
 import com.maydaymemory.mae.basic.ZYXBoneTransformFactory;
@@ -19,6 +18,7 @@ import example.animation.TestBlockAnimationInstance;
 import example.block.blockentity.TestBlockEntity;
 import example.init.ExampleModRegister;
 import example.resource.KnownResources;
+import example.client.worldmesh.ExampleBlockMeshGroup;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -30,42 +30,52 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.WeakHashMap;
-import java.util.function.Supplier;
 
 public class TreeTestBlockEntityRenderer implements BlockEntityRenderer<TestBlockEntity> {
     private static final ResourceLocation TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/test.png");
     private static final ResourceLocation POLY_MESH_TEST_TEXTURE = ExampleModRegister.modLoc("textures/block/vct.png");
     private static final EulerAdditiveBlender BLENDER = new SimpleEulerAdditiveBlender(new ZYXBoneTransformFactory(), ArrayPoseBuilder::new);
 
-    private final Supplier<TreeBedrockModel> testModelSupplier;
-    private final Supplier<TreeBedrockModel> polyMeshTestModelSupplier;
+    private TreeBedrockModel testModel;
+    private TreeBedrockModel polyMeshModel;
+    private BedrockAnimationFile testAnimation;
     private final WeakHashMap<TestBlockEntity, TreeModelInstance> testInstanceCache = new WeakHashMap<>();
     private final WeakHashMap<TestBlockEntity, TreeModelInstance> polyMeshInstanceCache = new WeakHashMap<>();
 
     public TreeTestBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
-        this.testModelSupplier = Suppliers.memoize(this::loadTestModel);
-        this.polyMeshTestModelSupplier = Suppliers.memoize(this::loadPolyMeshTestModel);
     }
 
     private TreeBedrockModel loadTestModel() {
         TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(KnownResources.TEST);
         BedrockAnimationFile animationFile = BedrockAnimationResources.getInstance().getAnimationFile(KnownResources.TEST);
-        if (model != null && animationFile != null) {
-            TestBlockAnimationContext.initialize(animationFile, model);
+        if (model != this.testModel || animationFile != this.testAnimation) {
+            this.testInstanceCache.clear();
+            this.testModel = model;
+            this.testAnimation = animationFile;
+            if (model != null && animationFile != null) TestBlockAnimationContext.initialize(animationFile, model);
         }
         return model;
     }
 
     private TreeBedrockModel loadPolyMeshTestModel() {
-        return BedrockModelResources.getInstance().getTreeModel(KnownResources.POLY_MESH_TEST);
+        TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(KnownResources.POLY_MESH_TEST);
+        if (model != this.polyMeshModel) {
+            this.polyMeshInstanceCache.clear();
+            this.polyMeshModel = model;
+        }
+        return model;
     }
 
     @Override
     public void render(@NotNull TestBlockEntity blockEntity, float partialTick, @NotNull PoseStack poseStack,
                        @NotNull MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         boolean polyMeshTest = blockEntity.getBlockState().is(ExampleModRegister.POLY_MESH_TEST_BLOCK);
-        TreeBedrockModel model = polyMeshTest ? polyMeshTestModelSupplier.get() : testModelSupplier.get();
+        TreeBedrockModel model = polyMeshTest ? loadPolyMeshTestModel() : loadTestModel();
         if (model == null) {
+            return;
+        }
+        // 静态路径开启时由 ExampleBlockMeshGroup 接管：这里只登记实例，绘制统一发生在 AFTER_BLOCK_ENTITIES。
+        if (ExampleBlockMeshGroup.tryEnqueue(blockEntity)) {
             return;
         }
 

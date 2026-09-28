@@ -66,6 +66,11 @@ public class ParticleEmitterInstance {
     private boolean fpLocalVelocity;
     private boolean fpToWorld;
 
+    /** 投递到世界空间的粒子（worldSpace=true）的尺寸/初速度附加缩放，默认 1。 */
+    private float worldParticleScale = 1.0f;
+    /** Whether world particles should keep their first-person screen size across FOV changes. */
+    private boolean fovCompensatedWorldParticles;
+
     private final Map<String, ParticleCurve> curves;
 
     @Nullable
@@ -253,31 +258,53 @@ public class ParticleEmitterInstance {
     private void applyLocalSpaceOnSpawn(ParticleInstance p) {
         boolean effectiveLocalPos = fpMode ? fpLocalPosition : localPosition;
         boolean effectiveLocalRot = fpMode ? fpLocalRotation : localRotation;
-        if (!effectiveLocalPos) {
-            float scale = extractScale(worldTransform);
-            p.spawnScale = scale;
+        // 尺寸缩放取自发射器本地（定位器）变换：worldTransform 可能是带非等比缩放的空间映射
+        // （例如手部 FOV 与世界 FOV 不一致时施加的横向补偿），直接取它的第一列长度会把这种
+        // 投影补偿算进粒子尺寸，因此尺寸比例改由调用方通过 worldParticleScale 显式给出。
+        float localScale = extractScale(emitterTransform);
+        float worldScale = localScale * worldParticleScale;
+        if (!effectiveLocalPos || (fpMode && fpToWorld)) {
+            // 世界空间粒子：位置与初速度必须走同一个映射（世界矩阵的线性部分，含补偿与非等比缩放）。
+            // 只补偿位置、速度另算会让粒子轨迹不对：横向补偿下朝相机方向飞来的粒子速度会偏快
+            // （FOV 越大偏得越多），几十毫秒就糊到镜头上。
+            p.spawnScale = worldScale;
             worldTransform.transform(tempSpawnVec.set(p.x, p.y, p.z, 1));
             p.x = tempSpawnVec.x; p.y = tempSpawnVec.y; p.z = tempSpawnVec.z;
             p.worldSpace = true;
-            if (!effectiveLocalRot) transformVelocityByMatrix(p, worldTransform, scale);
-            else { p.vx *= scale; p.vy *= scale; p.vz *= scale; }
+            if (!effectiveLocalRot) transformVelocityByLinearMap(p, worldTransform);
+            else { p.vx *= worldScale; p.vy *= worldScale; p.vz *= worldScale; }
         } else if (fpMode) {
-            Matrix4f ref = fpToWorld ? worldTransform : emitterTransform;
-            float scale = extractScale(ref);
-            p.spawnScale = scale;
-            ref.transform(tempSpawnVec.set(p.x, p.y, p.z, 1));
+            // 第一人称局部粒子：留在发射器本地空间，由手部 pass 渲染
+            p.spawnScale = localScale;
+            emitterTransform.transform(tempSpawnVec.set(p.x, p.y, p.z, 1));
             p.x = tempSpawnVec.x; p.y = tempSpawnVec.y; p.z = tempSpawnVec.z;
-            if (fpToWorld) p.worldSpace = true; else p.fpDetached = true;
-            if (!effectiveLocalRot) transformVelocityByMatrix(p, ref, scale);
-            else { p.vx *= scale; p.vy *= scale; p.vz *= scale; }
+            p.fpDetached = true;
+            if (!effectiveLocalRot) transformVelocityByMatrix(p, emitterTransform, localScale);
+            else { p.vx *= localScale; p.vy *= localScale; p.vz *= localScale; }
         } else {
-            p.spawnScale = extractScale(emitterTransform);
+            p.spawnScale = localScale;
         }
     }
 
     private static float extractScale(Matrix4f mat) {
         float m00 = mat.m00(), m01 = mat.m01(), m02 = mat.m02();
         return (float) Math.sqrt(m00 * m00 + m01 * m01 + m02 * m02);
+    }
+
+    /**
+     * 用矩阵的线性部分（含非等比缩放）变换速度。
+     * <p>
+     * 世界空间粒子的位置由 {@code worldTransform} 映射，速度必须用同一个线性映射：
+     * 只补位置、速度另算会让粒子在世界里偏离应有的轨迹（手部 FOV 与世界 FOV 不一致时的
+     * 横向补偿会让朝相机方向飞来的粒子速度偏快，FOV 越大偏得越多，很快就糊在镜头上）。
+     */
+    private static void transformVelocityByLinearMap(ParticleInstance p, Matrix4f mat) {
+        float vx = mat.m00() * p.vx + mat.m10() * p.vy + mat.m20() * p.vz;
+        float vy = mat.m01() * p.vx + mat.m11() * p.vy + mat.m21() * p.vz;
+        float vz = mat.m02() * p.vx + mat.m12() * p.vy + mat.m22() * p.vz;
+        p.vx = vx;
+        p.vy = vy;
+        p.vz = vz;
     }
 
     private static void transformVelocityByMatrix(ParticleInstance p, Matrix4f mat, float scale) {
@@ -318,6 +345,23 @@ public class ParticleEmitterInstance {
     public Matrix4f getEmitterTransform() { return emitterTransform; }
     public Matrix4f getWorldTransform() { return worldTransform; }
 
+    /**
+     * 投递到世界空间的粒子（{@code worldSpace=true}）的尺寸与初速度附加缩放，默认 1。
+     * <p>
+     * 供"世界矩阵带非等比投影补偿"的调用方使用：worldTransform 只负责把粒子放到正确的位置，
+     * 粒子尺寸应当取定位器（本地）缩放再乘本缩放值。第一人称手部 FOV 与世界 FOV 不一致时，
+     * 调用方传入 {@code tan(worldFov/2) / tan(modelFov/2)}，即可让世界空间粒子在屏幕上的大小
+     * 与手部 FOV 下的观感一致（跟随枪体/枪焰，而不是随玩家 FOV 放大缩小）。
+     * <p>
+     * 只影响被投递出去的 {@code worldSpace} 粒子的<b>尺寸</b>；留在发射器内、由第一人称系统渲染的
+     * 局部粒子不受影响。初速度不乘本值 —— 它按世界矩阵的线性部分（含横向补偿与非等比缩放）变换。
+     */
+    public void setWorldParticleScale(float scale) { this.worldParticleScale = scale; }
+    public float getWorldParticleScale() { return worldParticleScale; }
+
+    public void setFovCompensatedWorldParticles(boolean enabled) { this.fovCompensatedWorldParticles = enabled; }
+    public boolean isFovCompensatedWorldParticles() { return fovCompensatedWorldParticles; }
+
     public void setLocalSpaceFlags(boolean pos, boolean rot, boolean vel) {
         this.localPosition = pos;
         this.localRotation = rot;
@@ -338,6 +382,17 @@ public class ParticleEmitterInstance {
     public void setSleeping(boolean sleeping) { this.sleeping = sleeping; }
     public void setSleepTimer(float t) { this.sleepTimer = t; }
     public float getSleepTimer() { return sleepTimer; }
+
+    /**
+     * 立即废弃该发射器及其仍由第一人称系统持有的本地粒子。
+     * 已交给外部粒子管理器的世界空间粒子不在 {@link #particles} 中，仍按自身寿命消亡。
+     */
+    public void discard() {
+        removed = true;
+        active = false;
+        sleeping = false;
+        particles.clear();
+    }
 
     public float getEmitterAge() { return emitterAge; }
     public void setEmitterAge(float age) { this.emitterAge = age; }

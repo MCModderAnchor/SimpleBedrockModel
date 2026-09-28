@@ -8,11 +8,13 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.E
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumParticleVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumParticleVertexWriter;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.render.CameraStateCache;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.util.math.MathUtil;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.TextureSheetParticle;
@@ -36,6 +38,10 @@ public class SnowStormParticle extends TextureSheetParticle {
     private final ParticleInstance particleData;
     private final ParticleEffectDefinition definition;
     private final ParticleEmitterInstance emitter;
+    private final boolean fovCompensatedWorldParticle;
+    private final float birthFovScale;
+    @Nullable private final Matrix3f birthMotionMap;
+    @Nullable private final ParticleMotionDynamic dynamicMotion;
 
     // 锚点跟随：发射器启用 followAnchor 时，粒子保存锚点局部坐标，
     // 渲染时用发射器当前 worldTransform（含旋转+平移）重新求世界坐标——位置与朝向均跟随锚点
@@ -77,6 +83,13 @@ public class SnowStormParticle extends TextureSheetParticle {
         this.particleData = particleData;
         this.definition = definition;
         this.emitter = emitter;
+        float birthScale = emitter.getWorldParticleScale();
+        this.fovCompensatedWorldParticle = emitter.isFovCompensatedWorldParticles()
+                && Float.isFinite(birthScale) && birthScale > 1.0e-4f;
+        this.birthFovScale = birthScale;
+        this.birthMotionMap = fovCompensatedWorldParticle ? createBirthMotionMap(birthScale) : null;
+        this.dynamicMotion = fovCompensatedWorldParticle
+                ? definition.findComponent(ParticleMotionDynamic.class) : null;
 
         // 初始速度（blocks/tick）
         this.xd = particleData.vx / 20f;
@@ -154,6 +167,16 @@ public class SnowStormParticle extends TextureSheetParticle {
         }
     }
 
+    private static Matrix3f createBirthMotionMap(float scale) {
+        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+        Matrix4f worldToCamera = new Matrix4f()
+                .rotationX((float) Math.toRadians(camera.getXRot()))
+                .rotateY((float) Math.toRadians(camera.getYRot() + 180f))
+                .rotateZ(CameraStateCache.getCameraRollRadians());
+        Matrix4f cameraToWorld = new Matrix4f(worldToCamera).invert();
+        return new Matrix3f(cameraToWorld.scale(scale, scale, 1.0f).mul(worldToCamera));
+    }
+
     @Override
     public void tick() {
         this.xo = this.x;
@@ -171,6 +194,7 @@ public class SnowStormParticle extends TextureSheetParticle {
         float savedX = particleData.x, savedY = particleData.y, savedZ = particleData.z;
 
         emitter.updateSingleParticle(particleData, dt);
+        applyFovAcceleration(dt);
 
         particleData.x = savedX;
         particleData.y = savedY;
@@ -208,6 +232,25 @@ public class SnowStormParticle extends TextureSheetParticle {
         }
 
         this.age++;
+    }
+
+    private void applyFovAcceleration(float dt) {
+        if (birthMotionMap == null || dynamicMotion == null || dynamicMotion.linearAcceleration() == null) {
+            return;
+        }
+        var acceleration = dynamicMotion.linearAcceleration();
+        var context = emitter.getMolang().getContext();
+        float ax = (float) acceleration[0].evaluate(context);
+        float ay = (float) acceleration[1].evaluate(context);
+        float az = (float) acceleration[2].evaluate(context);
+        float mx = birthMotionMap.m00() * ax + birthMotionMap.m10() * ay + birthMotionMap.m20() * az;
+        float my = birthMotionMap.m01() * ax + birthMotionMap.m11() * ay + birthMotionMap.m21() * az;
+        float mz = birthMotionMap.m02() * ax + birthMotionMap.m12() * ay + birthMotionMap.m22() * az;
+        float drag = dynamicMotion.linearDragCoefficient() == null ? 1.0f
+                : Math.max(0.0f, 1.0f - (float) dynamicMotion.linearDragCoefficient().evaluate(context) * dt);
+        particleData.vx += (mx - ax) * drag * dt;
+        particleData.vy += (my - ay) * drag * dt;
+        particleData.vz += (mz - az) * drag * dt;
     }
 
     @Override
@@ -302,9 +345,13 @@ public class SnowStormParticle extends TextureSheetParticle {
             QUATERNION.rotateZ(currentRoll);
         }
 
-        // 粒子尺寸
-        float hw = particleData.width * particleData.spawnScale;
-        float hh = particleData.height * particleData.spawnScale;
+        // 粒子尺寸：第一人称世界粒子在绘制时按当前 FOV 补偿，避免旧/新粒子尺寸混杂。
+        float scale = particleData.spawnScale;
+        if (fovCompensatedWorldParticle) {
+            scale *= CameraStateCache.getWorldParticleScale() / birthFovScale;
+        }
+        float hw = particleData.width * scale;
+        float hh = particleData.height * scale;
 
         // UV
         float u0 = particleData.u0;
