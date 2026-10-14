@@ -2,11 +2,11 @@ package example.client.worldmesh;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer.BedrockModelRenderTypes;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshRenderer;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshGroup;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.MeshRenderable;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.GeometryCollector;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshStrategy;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshRenderer;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshGroup;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.MeshRenderable;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.capture.GeometryCollector;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshStrategy;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.runtime.TreeModelInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.tree.TreeBedrockModel;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
@@ -273,7 +273,7 @@ public final class ExampleStressMeshGroup {
         // 必须从事件里的 pose stack 起手：它含相机视图旋转，方块实体路径就是这么给顶点的
         // （BufferUploader 用的 ModelViewMat 是世界渲染期的单位阵）。少了这一步，顶点只有相机相对位移、
         // 没有视图旋转，几何会投到错误的屏幕位置。
-        poseStack.mulPose(event.getPoseStack().last().pose());
+        poseStack.mulPose(event.getModelViewMatrix());
         for (Instance instance : INSTANCES) {
             TreeBedrockModel model = BedrockModelResources.getInstance().getTreeModel(instance.modelId);
             if (model == null) continue;

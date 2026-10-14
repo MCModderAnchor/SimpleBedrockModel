@@ -501,11 +501,17 @@ public class FirstPersonRenderHandler {
     }
 
     /**
-     * 摄像机使用的当前活跃动画 instance：主手优先，主手不存在时回退副手。
+     * 摄像机使用的当前可渲染动画 instance：主手优先，再回退到可渲染的副手。
+     * 不可见的实例不参与相机动画或原版 viewBobbing 的取消。
      */
     public static IFPAnimationInstance getActiveAnimationInstanceForCamera() {
         IFPAnimationInstance main = getActiveAnimationInstance(InteractionHand.MAIN_HAND);
-        return main != null ? main : getActiveAnimationInstance(InteractionHand.OFF_HAND);
+        if (main != null && canActuallyRenderInHand(main, InteractionHand.MAIN_HAND)) {
+            return main;
+        }
+
+        IFPAnimationInstance off = getActiveAnimationInstance(InteractionHand.OFF_HAND);
+        return off != null && canActuallyRenderInHand(off, InteractionHand.OFF_HAND) ? off : null;
     }
 
     /**

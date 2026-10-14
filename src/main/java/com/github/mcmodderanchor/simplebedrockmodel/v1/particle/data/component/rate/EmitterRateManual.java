@@ -2,7 +2,6 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangExpression;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.IEmitterComponent;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.IEmitterComponentDefinition;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleMolangEnvironment;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;

@@ -5,7 +5,6 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangCont
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangExpression;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.compiled.MochaCompiledFunction;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.compiled.Named;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.binding.Entity;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.parser.ast.Expression;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;

@@ -1,7 +1,6 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleEffectDefinition;
-import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.event.IEventNode;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.EventExecutor;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
 import com.google.gson.JsonArray;

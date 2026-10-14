@@ -3,7 +3,6 @@ package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.ISodiumVertexWriter;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedQuadData;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedVertexData;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
@@ -34,11 +33,8 @@ public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexW
 
     public boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
                                  Matrix4f finalPose, Matrix3f finalNormal) {
-        VertexBufferWriter writer = VertexConsumerUtils.convertOrLog(consumer);
-        if (writer == null) {
-            return false;
-        }
-        return writeVertices(chunk, writer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        // Polymesh triangle buffers are incompatible with ModelVertex; callers must use VertexConsumer.
+        return false;
     }
 
     private boolean writeQuads(BakedGeometryChunk chunk, VertexBufferWriter writer, int lightmap, int overlay, float red, float green, float blue, float alpha,
@@ -81,40 +77,6 @@ public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexW
             emitVertex(ptr, transformX(positions[pb + 9], positions[pb + 10], positions[pb + 11], p00, p10, p20, p30), transformY(positions[pb + 9], positions[pb + 10], positions[pb + 11], p01, p11, p21, p31), transformZ(positions[pb + 9], positions[pb + 10], positions[pb + 11], p02, p12, p22, p32), color, uvs[ub + 6], uvs[ub + 7], overlay, lightmap, packedNormal);
             ptr += STRIDE;
             emitted += 4;
-            if (emitted >= MAX_VERTICES_PER_BATCH) {
-                flush(writer, emitted);
-                emitted = 0;
-                ptr = SCRATCH;
-            }
-        }
-        if (emitted > 0) {
-            flush(writer, emitted);
-        }
-        return true;
-    }
-
-    private boolean writeVertices(BakedGeometryChunk chunk, VertexBufferWriter writer, int lightmap, int overlay, float red, float green, float blue, float alpha,
-                                  Matrix4f finalPose, Matrix3f finalNormal) {
-        int color = (int) (alpha * 255.0f) << 24 | (int) (blue * 255.0f) << 16 | (int) (green * 255.0f) << 8 | (int) (red * 255.0f);
-        BakedVertexData vertices = chunk.vertices();
-        float[] positions = vertices.positions();
-        float[] normals = vertices.normals();
-        float[] uvs = vertices.uvs();
-        int emitted = 0;
-        long ptr = SCRATCH;
-        for (int i = 0; i < vertices.vertexCount(); i++) {
-            int pb = i * BakedVertexData.POSITION_STRIDE;
-            int nb = i * BakedVertexData.NORMAL_STRIDE;
-            int ub = i * BakedVertexData.UV_STRIDE;
-            float tx = transformX(positions[pb], positions[pb + 1], positions[pb + 2], finalPose.m00(), finalPose.m10(), finalPose.m20(), finalPose.m30());
-            float ty = transformY(positions[pb], positions[pb + 1], positions[pb + 2], finalPose.m01(), finalPose.m11(), finalPose.m21(), finalPose.m31());
-            float tz = transformZ(positions[pb], positions[pb + 1], positions[pb + 2], finalPose.m02(), finalPose.m12(), finalPose.m22(), finalPose.m32());
-            float tnx = finalNormal.m00() * normals[nb] + finalNormal.m10() * normals[nb + 1] + finalNormal.m20() * normals[nb + 2];
-            float tny = finalNormal.m01() * normals[nb] + finalNormal.m11() * normals[nb + 1] + finalNormal.m21() * normals[nb + 2];
-            float tnz = finalNormal.m02() * normals[nb] + finalNormal.m12() * normals[nb + 1] + finalNormal.m22() * normals[nb + 2];
-            emitVertex(ptr, tx, ty, tz, color, uvs[ub], uvs[ub + 1], overlay, lightmap, packNormal(tnx, tny, tnz));
-            ptr += STRIDE;
-            emitted++;
             if (emitted >= MAX_VERTICES_PER_BATCH) {
                 flush(writer, emitted);
                 emitted = 0;

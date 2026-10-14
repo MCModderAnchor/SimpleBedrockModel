@@ -120,3 +120,8 @@ runs/
 .worktrees/
 /.claude/
 /logs/
+/tools/analyze_vertex_attrib_benchmark.py
+/tools/ImmediateIntegerAttributesGlCheck.java
+/tools/run_immediate_integer_attributes_gl_check.ps1
+/tools/run_vertex_attrib_benchmark.ps1
+/tools/VertexAttribBenchmark.java

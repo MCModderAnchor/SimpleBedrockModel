@@ -1,9 +1,9 @@
 package example.client.worldmesh;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.StrategyOverride;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshRenderer;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshStats;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.StrategyOverride;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshRenderer;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshStats;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -17,6 +17,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLEnvironment;
 
 import java.util.Locale;
 
@@ -28,6 +29,75 @@ public final class ExampleMeshCommands {
 
     @SubscribeEvent
     public static void register(RegisterClientCommandsEvent event) {
+        if (FMLEnvironment.production) return;
+        var batch = Commands.literal("batch")
+                .then(Commands.literal("stop").executes(context -> {
+                    ExampleMeshBatchBenchmark.stop();
+                    return reply(context, "Mesh batch scene stopped.");
+                }))
+                .then(Commands.literal("status").executes(context -> reply(context, ExampleMeshBatchBenchmark.status())));
+        var batchStart = Commands.literal("start")
+                .executes(context -> batchStart(context, ExampleMeshBatchBenchmark.Layout.SAME, 128, 120, 3));
+        for (ExampleMeshBatchBenchmark.Layout layout : ExampleMeshBatchBenchmark.Layout.values()) {
+            batchStart.then(Commands.literal(layout.name().toLowerCase(Locale.ROOT))
+                    .executes(context -> batchStart(context, layout, 128, 120, 3))
+                    .then(Commands.argument("count", IntegerArgumentType.integer(1, 512))
+                            .executes(context -> batchStart(context, layout, IntegerArgumentType.getInteger(context, "count"), 120, 3))
+                            .then(Commands.argument("frames", IntegerArgumentType.integer(30, 1200))
+                                    .executes(context -> batchStart(context, layout, IntegerArgumentType.getInteger(context, "count"),
+                                            IntegerArgumentType.getInteger(context, "frames"), 3))
+                                    .then(Commands.argument("repeats", IntegerArgumentType.integer(1, 10))
+                                            .executes(context -> batchStart(context, layout, IntegerArgumentType.getInteger(context, "count"),
+                                                    IntegerArgumentType.getInteger(context, "frames"),
+                                                    IntegerArgumentType.getInteger(context, "repeats")))))));
+        }
+        batch.then(batchStart);
+        var batchView = Commands.literal("view");
+        for (ExampleMeshBatchBenchmark.Mode mode : ExampleMeshBatchBenchmark.Mode.values()) {
+            var viewMode = Commands.literal(mode.name().toLowerCase(Locale.ROOT))
+                    .executes(context -> batchView(context, mode, ExampleMeshBatchBenchmark.Layout.SAME, 128));
+            for (ExampleMeshBatchBenchmark.Layout layout : ExampleMeshBatchBenchmark.Layout.values()) {
+                viewMode.then(Commands.literal(layout.name().toLowerCase(Locale.ROOT))
+                        .executes(context -> batchView(context, mode, layout, 128))
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 512))
+                                .executes(context -> batchView(context, mode, layout, IntegerArgumentType.getInteger(context, "count")))));
+            }
+            batchView.then(viewMode);
+        }
+        batch.then(batchView);
+        var attributes = Commands.literal("attrib")
+                .then(Commands.literal("stop").executes(context -> {
+                    ExampleImmediateAttributeBenchmark.stop();
+                    return reply(context, "Immediate attribute benchmark stopped.");
+                }))
+                .then(Commands.literal("status").executes(context -> reply(context, ExampleImmediateAttributeBenchmark.status())));
+        for (ExampleImmediateAttributeBenchmark.Scene scene : ExampleImmediateAttributeBenchmark.Scene.values()) {
+            for (boolean both : new boolean[]{false, true}) {
+                boolean glow = scene == ExampleImmediateAttributeBenchmark.Scene.TACZ_GLOW;
+                String start = glow ? (both ? "glow_both" : "glow") : (both ? "both" : "start");
+                attributes.then(Commands.literal(start)
+                        .executes(context -> attributes(context, 128, 120, 3, both, scene))
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 512))
+                                .executes(context -> attributes(context, IntegerArgumentType.getInteger(context, "count"), 120, 3, both, scene))
+                                .then(Commands.argument("frames", IntegerArgumentType.integer(30, 1200))
+                                        .executes(context -> attributes(context, IntegerArgumentType.getInteger(context, "count"),
+                                                IntegerArgumentType.getInteger(context, "frames"), 3, both, scene))
+                                        .then(Commands.argument("repeats", IntegerArgumentType.integer(1, 10))
+                                                .executes(context -> attributes(context, IntegerArgumentType.getInteger(context, "count"),
+                                                        IntegerArgumentType.getInteger(context, "frames"),
+                                                        IntegerArgumentType.getInteger(context, "repeats"), both, scene))))));
+                String view = glow ? (both ? "view_glow_both" : "view_glow") : (both ? "view_both" : "view");
+                var preview = Commands.literal(view);
+                for (ExampleImmediateAttributeBenchmark.Mode mode : ExampleImmediateAttributeBenchmark.Mode.values()) {
+                    preview.then(Commands.literal(mode.name().toLowerCase(Locale.ROOT))
+                            .executes(context -> viewAttributes(context, mode, 128, both, scene))
+                            .then(Commands.argument("count", IntegerArgumentType.integer(1, 512))
+                                    .executes(context -> viewAttributes(context, mode,
+                                            IntegerArgumentType.getInteger(context, "count"), both, scene))));
+                }
+                attributes.then(preview);
+            }
+        }
         LiteralArgumentBuilder<CommandSourceStack> stress = Commands.literal("stress")
                 .then(Commands.literal("clear").executes(context -> {
                     ExampleStressMeshGroup.clear();
@@ -59,7 +129,11 @@ public final class ExampleMeshCommands {
         event.getDispatcher().register(Commands.literal("sbmmesh")
                 .executes(context -> reply(context, "/sbmmesh enabled <true|false> | path <auto|instance|section>"
                         + " | stats [detail] | cache clear | stress <same|models|all|dynamic> [count] | stress clear"
-                        + " | stress light start [intervalTicks] [batchSize] | stress light stop|reset"))
+                        + " | stress light start [intervalTicks] [batchSize] | stress light stop|reset"
+                        + " | attrib start|both|glow|glow_both [count] [frames] [repeats]"
+                        + " | attrib view|view_both|view_glow|view_glow_both <mode> [count] | attrib status|stop"
+                        + " | batch start <same|models|all> [count] [frames] [repeats]"
+                        + " | batch view <immediate|ordered|batched> [same|models|all] [count] | batch status|stop"))
                 .then(Commands.literal("enabled")
                         .then(Commands.argument("value", BoolArgumentType.bool()).executes(context -> {
                             boolean value = BoolArgumentType.getBool(context, "value");
@@ -76,7 +150,46 @@ public final class ExampleMeshCommands {
                     WorldMeshRenderer.clearCaches();
                     return reply(context, "Mesh caches invalidated; group objects retained.");
                 })))
-                .then(stress));
+                .then(stress)
+                .then(attributes)
+                .then(batch));
+    }
+
+    private static int batchStart(CommandContext<CommandSourceStack> context, ExampleMeshBatchBenchmark.Layout layout,
+                                  int count, int frames, int repeats) {
+        if (!ExampleMeshBatchBenchmark.start(layout, count, frames, repeats)) {
+            context.getSource().sendFailure(Component.literal("Could not start mesh batch benchmark; see client log."));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int batchView(CommandContext<CommandSourceStack> context, ExampleMeshBatchBenchmark.Mode mode,
+                                 ExampleMeshBatchBenchmark.Layout layout, int count) {
+        if (!ExampleMeshBatchBenchmark.view(mode, layout, count)) {
+            context.getSource().sendFailure(Component.literal("Could not start mesh batch preview; see client log."));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int attributes(CommandContext<CommandSourceStack> context, int count, int frames, int repeats,
+                                  boolean both, ExampleImmediateAttributeBenchmark.Scene scene) {
+        if (!ExampleImmediateAttributeBenchmark.start(count, frames, repeats, both, scene)) {
+            context.getSource().sendFailure(Component.literal("Could not start immediate attribute benchmark; see client log."));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int viewAttributes(CommandContext<CommandSourceStack> context,
+                                      ExampleImmediateAttributeBenchmark.Mode mode, int count, boolean both,
+                                      ExampleImmediateAttributeBenchmark.Scene scene) {
+        if (!ExampleImmediateAttributeBenchmark.view(mode, count, both, scene)) {
+            context.getSource().sendFailure(Component.literal("Could not start visual attribute comparison; see client log."));
+            return 0;
+        }
+        return 1;
     }
 
     private static int stress(CommandContext<CommandSourceStack> context, ExampleStressMeshGroup.Mode mode, int count) {

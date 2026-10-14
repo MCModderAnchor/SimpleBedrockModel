@@ -1,6 +1,6 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.config;
 
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.StrategyOverride;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.StrategyOverride;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /** 无客户端游戏类依赖，允许在模组构造阶段注册 CLIENT 配置。 */

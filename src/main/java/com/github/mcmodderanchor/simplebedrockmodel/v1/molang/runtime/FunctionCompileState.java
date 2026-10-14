@@ -26,7 +26,6 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.util.CaseInsensitiveStringHashMap;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Type;
 
 import java.lang.reflect.Method;
 import java.util.Map;

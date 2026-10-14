@@ -1,9 +1,9 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.command;
 
 import com.github.mcmodderanchor.simplebedrockmodel.SimpleBedrockModel;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshGroupStats;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.WorldMeshRenderer;
-import com.github.mcmodderanchor.simplebedrockmodel.v2.client.world.StrategyOverride;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshGroupStats;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.WorldMeshRenderer;
+import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world.StrategyOverride;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;

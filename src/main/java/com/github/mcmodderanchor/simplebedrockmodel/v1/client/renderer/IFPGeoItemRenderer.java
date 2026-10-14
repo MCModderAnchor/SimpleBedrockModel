@@ -2,7 +2,6 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.client.renderer;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.animation.IFPAnimationInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.firstperson.FirstPersonParticleSystem;
-import com.maydaymemory.mae.basic.YXZRotationView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -13,7 +12,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
-import org.joml.Vector3fc;
 
 public interface IFPGeoItemRenderer {
 
