@@ -139,10 +139,7 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
     }
 
     protected BedrockMesh createPolyMesh(PolyMeshItem polyMesh, BedrockBone part, float texWidth, float texHeight) {
-        // 这东西有问题，先不用它了
-//        if (SodiumCompat.isSodiumInstalled()) {
-//            return new SodiumBedrockPolyMesh(polyMesh, part, texWidth, texHeight);
-//        }
+        // Sodium 的 ModelVertex 与 polymesh 三角形缓冲格式不兼容，会导致顶点位置损坏。
         return new BedrockPolyMesh(polyMesh, part, texWidth, texHeight);
     }
 

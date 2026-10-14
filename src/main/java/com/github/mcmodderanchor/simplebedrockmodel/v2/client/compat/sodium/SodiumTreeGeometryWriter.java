@@ -41,9 +41,8 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
 
     public boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, int lightmap, int overlay, float red, float green, float blue, float alpha,
                                    Matrix4f finalPose, Matrix3f finalNormal) {
-        VertexBufferWriter writer = VertexConsumerUtils.convertOrLog(consumer);
-        if (writer == null) return false;
-        return writePolyMeshes(polyMeshes, writer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        // Polymesh triangle buffers are incompatible with ModelVertex; callers must use VertexConsumer.
+        return false;
     }
 
     private synchronized boolean writeCubes(ICube[] cubes, VertexBufferWriter writer, int lightmap, int overlay, float red, float green, float blue, float alpha,
@@ -112,37 +111,6 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
         return true;
     }
 
-    private boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexBufferWriter writer, int lightmap, int overlay, float red, float green, float blue, float alpha,
-                                    Matrix4f finalPose, Matrix3f finalNormal) {
-        int color = color(red, green, blue, alpha);
-        int emitted = 0;
-        long ptr = SCRATCH;
-        for (PolyMesh polyMesh : polyMeshes) {
-            for (PolyMesh.Triangle triangle : polyMesh.triangles()) {
-                ptr = emitMeshVertex(ptr, triangle.a(), finalPose, finalNormal, color, overlay, lightmap);
-                if (++emitted >= MAX_VERTICES_PER_BATCH) {
-                    flush(writer, emitted);
-                    emitted = 0;
-                    ptr = SCRATCH;
-                }
-                ptr = emitMeshVertex(ptr, triangle.b(), finalPose, finalNormal, color, overlay, lightmap);
-                if (++emitted >= MAX_VERTICES_PER_BATCH) {
-                    flush(writer, emitted);
-                    emitted = 0;
-                    ptr = SCRATCH;
-                }
-                ptr = emitMeshVertex(ptr, triangle.c(), finalPose, finalNormal, color, overlay, lightmap);
-                if (++emitted >= MAX_VERTICES_PER_BATCH) {
-                    flush(writer, emitted);
-                    emitted = 0;
-                    ptr = SCRATCH;
-                }
-            }
-        }
-        if (emitted > 0) flush(writer, emitted);
-        return true;
-    }
-
     private static void prepareCubeVertices(ICube cube, Matrix4f pose) {
         float x = cube.x();
         float y = cube.y();
@@ -192,28 +160,6 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
                 pose.m01() * x + pose.m11() * y + pose.m21() * z + pose.m31(),
                 pose.m02() * x + pose.m12() * y + pose.m22() * z + pose.m32(),
                 color, u, v, overlay, lightmap, normal);
-        return ptr + STRIDE;
-    }
-
-    private long emitMeshVertex(long ptr, PolyMesh.Vertex vertex, Matrix4f pose, Matrix3f normalMatrix, int color, int overlay, int lightmap) {
-        float x = vertex.x();
-        float y = vertex.y();
-        float z = vertex.z();
-        float nx = normalMatrix.m00() * vertex.nx() + normalMatrix.m10() * vertex.ny() + normalMatrix.m20() * vertex.nz();
-        float ny = normalMatrix.m01() * vertex.nx() + normalMatrix.m11() * vertex.ny() + normalMatrix.m21() * vertex.nz();
-        float nz = normalMatrix.m02() * vertex.nx() + normalMatrix.m12() * vertex.ny() + normalMatrix.m22() * vertex.nz();
-        float normalLength = nx * nx + ny * ny + nz * nz;
-        if (normalLength > 1.0E-12f) {
-            float invLength = (float) (1.0 / Math.sqrt(normalLength));
-            nx *= invLength;
-            ny *= invLength;
-            nz *= invLength;
-        }
-        ModelVertex.write(ptr,
-                pose.m00() * x + pose.m10() * y + pose.m20() * z + pose.m30(),
-                pose.m01() * x + pose.m11() * y + pose.m21() * z + pose.m31(),
-                pose.m02() * x + pose.m12() * y + pose.m22() * z + pose.m32(),
-                color, vertex.u(), vertex.v(), overlay, lightmap, packNormal(nx, ny, nz));
         return ptr + STRIDE;
     }
 

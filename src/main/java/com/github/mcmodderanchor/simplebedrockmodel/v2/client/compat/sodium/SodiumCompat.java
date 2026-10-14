@@ -25,8 +25,8 @@ public final class SodiumCompat {
 
     public static boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
                                         float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
-        return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()
-                && BackendHolder.WRITER.writeVertices(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        // Sodium's ModelVertex format is incompatible with polymesh triangle buffers and corrupts vertex positions.
+        return false;
     }
 
     public static boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay,
@@ -43,8 +43,8 @@ public final class SodiumCompat {
 
     public static boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, int lightmap, int overlay,
                                           float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
-        return com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()
-                && BackendHolder.TREE_WRITER.writePolyMeshes(polyMeshes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        // Keep tree polymesh on the standard VertexConsumer path for the same format incompatibility.
+        return false;
     }
 
     private static final class BackendHolder {
