@@ -28,9 +28,8 @@ public final class SodiumCompat {
 
     public static boolean writeVertices(BakedGeometryChunk chunk, VertexConsumer consumer, int lightmap, int overlay,
                                         float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
-        // Keep Sodium polymesh triangles on the standard VertexConsumer path.
-        if (com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()) return false;
-        return WRITER.writeVertices(chunk, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
+        // Sodium and Embeddium triangle buffers must use the standard VertexConsumer path.
+        return false;
     }
 
     public static boolean writeCubes(ICube[] cubes, VertexConsumer consumer, int lightmap, int overlay,
@@ -52,12 +51,7 @@ public final class SodiumCompat {
 
     public static boolean writePolyMeshes(PolyMesh[] polyMeshes, VertexConsumer consumer, int lightmap, int overlay,
                                           float red, float green, float blue, float alpha, Matrix4f finalPose, Matrix3f finalNormal) {
-        if (com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumCompat.isSodiumInstalled()) {
-            return false; // Sodium triangle buffers use the ordinary vertex writer.
-        }
-        if (com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.embeddium.EmbeddiumCompat.isEmbeddiumInstalled()) {
-            return EmbeddiumTreeWriterHolder.WRITER.writePolyMeshes(polyMeshes, consumer, lightmap, overlay, red, green, blue, alpha, finalPose, finalNormal);
-        }
+        // Keep both tree polymesh backends on the ordinary vertex writer.
         return false;
     }
 
