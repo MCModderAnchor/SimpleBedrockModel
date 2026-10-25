@@ -152,6 +152,7 @@ public class MeshIntegerAttributes {
 
     /** 分配／上传失败记录并停用后端，直到明确的生命周期重置。 */
     public boolean ensureReady() {
+        RenderSystem.assertOnRenderThread();
         if (buffer >= 0) return true;
         if (!supported || failed) return false;
         int previous = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
@@ -164,8 +165,12 @@ public class MeshIntegerAttributes {
             fillParameters(pairs);
             pairs.flip();
             GL15.glBufferData(GL15.GL_ARRAY_BUFFER, pairs, GL15.GL_STATIC_DRAW);
-            if (GL15.glGetBufferParameteri(GL15.GL_ARRAY_BUFFER, GL15.GL_BUFFER_SIZE) != TABLE_BYTES) {
-                throw new IllegalStateException("Integer attribute buffer upload did not allocate the complete table");
+            // AMD 驱动存在在此 GL_BUFFER_SIZE 查询中发生原生访问违规的报告，Java 无法捕获。
+            // 用 GL 错误检查拒绝失败的上传，避免额外查询缓冲对象参数。
+            int error = GL11.glGetError();
+            if (error != GL11.GL_NO_ERROR) {
+                throw new IllegalStateException("Integer attribute buffer upload error 0x"
+                        + Integer.toHexString(error));
             }
             buffer = created;
             created = -1;

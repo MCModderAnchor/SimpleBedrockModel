@@ -5,13 +5,16 @@ import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders
 import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.VertexConsumerExtension;
 import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.renderers.IAcceleratedRenderer;
 import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.render.BillboardTransforms;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 /**
  * 第一人称粒子的 AR 加速渲染：把单个 billboard quad 以「局部坐标 + beginTransform」提交成 mesh，
@@ -47,7 +50,7 @@ final class AcceleratedParticleRenderer {
         float hh = particle.height * particle.spawnScale;
         float cx = particle.x, cy = particle.y, cz = particle.z;
 
-        // 局部空间的轴（屏幕对齐 quad），经 beginTransform 的 transform 变换到视图空间即得正确朝向。
+        // quad 使用单位轴；提交矩阵保留粒子中心，并撤销 ModelView 对轴的旋转。
         float ax = 1f, ay = 0f, az = 0f;
         float bx = 0f, by = 1f, bz = 0f;
 
@@ -65,7 +68,9 @@ final class AcceleratedParticleRenderer {
             bz = -taz * sin + bz * cos;
         }
 
-        extension.beginTransform(transform, normal);
+        Matrix4f billboardPose = BillboardTransforms.billboardPose(RenderSystem.getModelViewMatrix(), transform,
+                new Vector3f(cx, cy, cz));
+        extension.beginTransform(billboardPose, normal);
 
         vertex(vertexConsumer, cx - ax * hw - bx * hh, cy - ay * hw - by * hh, cz - az * hw - bz * hh,
                 particle.u0, particle.v1, particle, light, overlay);

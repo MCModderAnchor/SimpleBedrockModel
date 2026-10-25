@@ -3,6 +3,7 @@ package com.github.mcmodderanchor.simplebedrockmodel.v1.particle.render;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.ParticleAppearanceBillboard;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.world.SnowStormParticle;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -27,7 +28,7 @@ public final class BillboardHelper {
     private static final Vector3f TEMP_AXIS_X = new Vector3f();
     private static final Vector3f TEMP_AXIS_Y = new Vector3f();
     private static final Vector3f TEMP_DIR = new Vector3f();
-    private static final Matrix4f IDENTITY_POSE = new Matrix4f();
+
     private static final Matrix3f IDENTITY_NORMAL = new Matrix3f();
 
     private BillboardHelper() {}
@@ -47,7 +48,9 @@ public final class BillboardHelper {
                                         boolean localPos, boolean localRot,
                                         float cameraPitch, float cameraRoll,
                                         @Nullable Matrix4f cameraRotation) {
-        Matrix4f pose = poseStack.last().pose();
+        // 1.21.1 将视图变换拆在 ModelView 和 PoseStack 中；billboard 轴必须在完整视图空间计算。
+        Matrix4f modelView = RenderSystem.getModelViewMatrix();
+        Matrix4f pose = BillboardTransforms.viewPose(modelView, poseStack.last().pose());
 
         // 选择变换矩阵：
         // - localPos 且非 fpDetached：用 pose × emitterTransform（跟随定位器）
@@ -97,20 +100,20 @@ public final class BillboardHelper {
         // 直接在视图空间中构建 4 个顶点
         float cx = TEMP_VIEW_POS.x, cy = TEMP_VIEW_POS.y, cz = TEMP_VIEW_POS.z;
 
-        // 使用 identity pose，顶点已经在视图空间中
-        IDENTITY_POSE.identity();
+        // 顶点已在视图空间；提交前撤销 ModelView，避免着色器再次变换 billboard 的轴。
+        Matrix4f submissionPose = BillboardTransforms.viewToRender(modelView);
         IDENTITY_NORMAL.identity();
 
-        vertex(consumer, IDENTITY_POSE, IDENTITY_NORMAL,
+        vertex(consumer, submissionPose, IDENTITY_NORMAL,
                 cx - axisX.x * hw - axisY.x * hh, cy - axisX.y * hw - axisY.y * hh, cz - axisX.z * hw - axisY.z * hh,
                 particle.u0, particle.v1, particle, light);
-        vertex(consumer, IDENTITY_POSE, IDENTITY_NORMAL,
+        vertex(consumer, submissionPose, IDENTITY_NORMAL,
                 cx - axisX.x * hw + axisY.x * hh, cy - axisX.y * hw + axisY.y * hh, cz - axisX.z * hw + axisY.z * hh,
                 particle.u0, particle.v0, particle, light);
-        vertex(consumer, IDENTITY_POSE, IDENTITY_NORMAL,
+        vertex(consumer, submissionPose, IDENTITY_NORMAL,
                 cx + axisX.x * hw + axisY.x * hh, cy + axisX.y * hw + axisY.y * hh, cz + axisX.z * hw + axisY.z * hh,
                 particle.u1, particle.v0, particle, light);
-        vertex(consumer, IDENTITY_POSE, IDENTITY_NORMAL,
+        vertex(consumer, submissionPose, IDENTITY_NORMAL,
                 cx + axisX.x * hw - axisY.x * hh, cy + axisX.y * hw - axisY.y * hh, cz + axisX.z * hw - axisY.z * hh,
                 particle.u1, particle.v1, particle, light);
     }

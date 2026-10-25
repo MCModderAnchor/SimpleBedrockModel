@@ -353,15 +353,15 @@ public class SnowStormParticle extends TextureSheetParticle {
         float hw = particleData.width * scale;
         float hh = particleData.height * scale;
 
-        // UV
-        float u0 = particleData.u0;
+        // 反转 X 轴以匹配 1.21.1 原版粒子的正面绕序，同时交换 U 保持贴图方向。
+        float u0 = particleData.u1;
         float v0 = particleData.v0;
-        float u1 = particleData.u1;
+        float u1 = particleData.u0;
         float v1 = particleData.v1;
 
         int light = getLightColor(partialTicks);
 
-        AXIS_X.set(1, 0, 0).rotate(QUATERNION).mul(hw);
+        AXIS_X.set(-1, 0, 0).rotate(QUATERNION).mul(hw);
         AXIS_Y.set(0, 1, 0).rotate(QUATERNION).mul(hh);
 
         float ax = AXIS_X.x(), ay = AXIS_X.y(), az = AXIS_X.z();

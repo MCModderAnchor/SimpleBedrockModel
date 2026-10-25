@@ -60,7 +60,7 @@ provider 在本次调用的预算内同步捕获，资源暂不可用返回 fals
 ./tools/run_immediate_integer_attributes_gl_check.ps1 -JavaHome $env:JAVA_HOME
 ```
 
-GL 工具要求 JDK 21，使用已有 `build/moddev/clientLegacyClasspath.txt` 和 NeoForge 的合并 JAR；`JAVA_HOME` 未指向 JDK 21 时通过 `-JavaHome` 传入其目录。该工具属于 Git 忽略的本地开发文件，发布源码包不包含它。Maven Local 坐标为 `com.github.mcmodderanchor:simplebedrockmodel:2.6.0-neoforge-mc1.21.1`。
+GL 工具要求 JDK 21，使用已有 `build/moddev/clientLegacyClasspath.txt` 和 NeoForge 的合并 JAR；`JAVA_HOME` 未指向 JDK 21 时通过 `-JavaHome` 传入其目录。该工具属于 Git 忽略的本地开发文件，发布源码包不包含它。Maven Local 坐标为 `com.github.mcmodderanchor:simplebedrockmodel:2.6.1-neoforge-mc1.21.1`。
 
 开发客户端的最小画面／性能对照：
 
