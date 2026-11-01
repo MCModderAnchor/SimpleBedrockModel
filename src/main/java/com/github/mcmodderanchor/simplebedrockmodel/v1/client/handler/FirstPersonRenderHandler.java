@@ -17,6 +17,7 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
@@ -113,7 +114,7 @@ public class FirstPersonRenderHandler {
     }
 
     @SubscribeEvent
-    public static void onClientTick(RenderFrameEvent.Pre event) {
+    public static void onClientTick(ClientTickEvent.Pre event) {
         if (!CLOCK.shouldTick()) {
             return;
         }
