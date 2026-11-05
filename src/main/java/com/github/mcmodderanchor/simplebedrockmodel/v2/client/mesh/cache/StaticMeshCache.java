@@ -371,11 +371,8 @@ public class StaticMeshCache {
             int previousArray = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
             try {
                 if (part.buffer.isInvalid()) throw new IllegalStateException("Upload target retired");
-                part.buffer.bind();
+                RenderSystem.glBindVertexArray(part.buffer.arrayObjectId);
                 payload.upload(part.buffer::upload);
-                int error = GL11.glGetError(); // 只在低频上传点检查，不放入逐实例 draw。
-                if (error != GL11.GL_NO_ERROR) throw new IllegalStateException("OpenGL upload error 0x"
-                        + Integer.toHexString(error) + " for " + entry.key);
                 RenderSystem.glBindVertexArray(previousVao);
                 GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER, previousArray);
                 if (generation != StaticMeshCache.generation || CACHE.get(entry.key) != entry) {
