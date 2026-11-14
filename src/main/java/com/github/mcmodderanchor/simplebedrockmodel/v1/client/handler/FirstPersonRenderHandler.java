@@ -200,8 +200,8 @@ public class FirstPersonRenderHandler {
             OFF_STATE.activeInstance.updateItem(newOff);
         }
 
-        tickStates(MAIN_STATE, InteractionHand.MAIN_HAND);
-        tickStates(OFF_STATE, InteractionHand.OFF_HAND);
+        tickStates(MAIN_STATE, InteractionHand.MAIN_HAND, newMain);
+        tickStates(OFF_STATE, InteractionHand.OFF_HAND, newOff);
     }
 
     /**
@@ -263,31 +263,31 @@ public class FirstPersonRenderHandler {
             // 零时长收枪没有后续动画帧可供 tickStates 收尾（直接丢弃物品也常走此处），
             // 必须在当前 tick 完成切换，否则旧 loop emitter 会继续使用最后的手部变换。
             if (state.currentSheatheDuration <= 0L) {
-                finishTransition(state, hand);
+                finishTransition(state, hand, newStack);
             }
         } else {
             state.transitioning = false;
         }
     }
 
-    private static void tickStates(HandRenderState state, InteractionHand hand) {
+    private static void tickStates(HandRenderState state, InteractionHand hand, ItemStack heldItem) {
         if (state.transitioning && getSheatheProgress(state) >= 1.0f) {
-            finishTransition(state, hand);
+            finishTransition(state, hand, heldItem);
         }
     }
 
     /**
      * 结束收枪过渡。该路径也用于零时长收枪，确保直接丢弃物品不依赖下一帧状态 tick。
      */
-    private static void finishTransition(HandRenderState state, InteractionHand hand) {
+    private static void finishTransition(HandRenderState state, InteractionHand hand, ItemStack heldItem) {
         // previousInstance 不再渲染，局部粒子也失去正确的模型空间基准。此前收枪动画
         // 仍可正常触发粒子；现在才废弃旧 emitter，避免它们在下一件物品上错位渲染。
         PARTICLE_SYSTEM.discardEmitters(hand);
         state.transitioning = false;
-        // 过渡完成后用该手当前真实物品创建 instance（而非可能过期的 pendingTarget），
-        // 并按当前形态记录变体键。
-        state.activeInstance = createInstance(state.realItem, hand);
-        state.variantKey = getRenderVariantKey(state.realItem, hand);
+        // 同 ID 的物品切换可能不刷新比较快照。收枪结束时复制当前物品，供新实例和变体键使用。
+        ItemStack target = heldItem.copy();
+        state.activeInstance = createInstance(target, hand);
+        state.variantKey = getRenderVariantKey(target, hand);
         state.previousInstance = null;
     }
 
