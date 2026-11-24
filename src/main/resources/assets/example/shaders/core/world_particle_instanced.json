@@ -1,0 +1,22 @@
+{
+    "blend": {
+        "func": "add",
+        "srcrgb": "srcalpha",
+        "dstrgb": "1-srcalpha"
+    },
+    "vertex": "example:world_particle_instanced",
+    "fragment": "particle",
+    "attributes": ["CenterRoll", "HalfSize", "Color", "UV2", "UVBounds"],
+    "samplers": [{"name": "Sampler0"}, {"name": "Sampler2"}],
+    "uniforms": [
+        {"name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+        {"name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+        {"name": "ColorModulator", "type": "float", "count": 4, "values": [1, 1, 1, 1]},
+        {"name": "FogStart", "type": "float", "count": 1, "values": [0]},
+        {"name": "FogEnd", "type": "float", "count": 1, "values": [1]},
+        {"name": "FogColor", "type": "float", "count": 4, "values": [0, 0, 0, 0]},
+        {"name": "FogShape", "type": "int", "count": 1, "values": [0]},
+        {"name": "CameraRight", "type": "float", "count": 3, "values": [1, 0, 0]},
+        {"name": "CameraUp", "type": "float", "count": 3, "values": [0, 1, 0]}
+    ]
+}

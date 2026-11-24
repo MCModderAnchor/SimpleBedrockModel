@@ -6,12 +6,14 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockAnim
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.event.RegisterBedrockModelReloadListenerEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.resource.ParticleDefinitionLoader;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.world.MolangWorldParticleRenderType;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.event.RegisterV2BedrockResourcesEvent;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockAnimationResources;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.resource.BedrockModelResources;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModLoader;
@@ -48,6 +50,8 @@ public class ReloadListenersRegister {
             event.registerReloadListener(BedrockAnimationResources.INSTANCE);
             event.registerReloadListener(BedrockModelResources.INSTANCE);
             event.registerReloadListener(ParticleDefinitionLoader.getInstance());
+            event.registerReloadListener((ResourceManagerReloadListener) manager ->
+                    MolangWorldParticleRenderType.invalidateCompute());
         }
     }
 

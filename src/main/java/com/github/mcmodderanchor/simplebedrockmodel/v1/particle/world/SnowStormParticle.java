@@ -72,7 +72,7 @@ public class SnowStormParticle extends TextureSheetParticle {
     private final ParticleExpireIfNotInBlocks expireIfNotInBlocks;
 
     // 自定义 RenderType（按纹理+材质缓存）
-    private final ParticleRenderType renderType;
+    private final MolangWorldParticleRenderType renderType;
 
     public SnowStormParticle(ClientLevel level, ParticleInstance particleData,
                              ParticleEffectDefinition definition,
@@ -319,6 +319,25 @@ public class SnowStormParticle extends TextureSheetParticle {
 
     @Override
     public void render(VertexConsumer buffer, Camera camera, float partialTicks) {
+        if (!renderType.collect(this, buffer, camera, partialTicks)) {
+            renderCpu(buffer, camera, partialTicks);
+        }
+    }
+
+    public boolean supportsCompute() {
+        return faceCameraMode == ParticleAppearanceBillboard.FaceCameraMode.ROTATE_XYZ
+                && !followAnchor && !fovCompensatedWorldParticle;
+    }
+
+    public void writeComputeRecord(long address, Vec3 eye, float partialTick) {
+        WorldParticleCompute.writeRecord(address,
+                (float) (Mth.lerp(partialTick, xo, x) - eye.x),
+                (float) (Mth.lerp(partialTick, yo, y) - eye.y),
+                (float) (Mth.lerp(partialTick, zo, z) - eye.z),
+                Mth.lerp(partialTick, oRoll, roll), particleData, rCol, gCol, bCol, alpha, getLightColor(partialTick));
+    }
+
+    public void renderCpu(VertexConsumer buffer, Camera camera, float partialTicks) {
         Vec3 camPos = camera.getPosition();
         float cx, cy, cz;
         if (followAnchor) {

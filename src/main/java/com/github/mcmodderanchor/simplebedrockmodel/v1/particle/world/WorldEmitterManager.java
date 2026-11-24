@@ -101,6 +101,7 @@ public class WorldEmitterManager {
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         getInstance().clear();
+        WorldParticleCompute.invalidate();
     }
 
     /**

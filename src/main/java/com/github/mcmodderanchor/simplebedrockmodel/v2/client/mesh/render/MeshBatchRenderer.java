@@ -159,6 +159,19 @@ public class MeshBatchRenderer implements AutoCloseable {
     }
 
     public static void uploadSharedUniforms(ShaderInstance shader, Matrix4f baseView, Matrix4f projection) {
+        setSharedUniforms(shader, baseView, projection);
+        boolean constantAmbient = Minecraft.getInstance().level != null
+                && Minecraft.getInstance().level.effects().constantAmbientLight();
+        if (shader.LIGHT0_DIRECTION != null) {
+            shader.LIGHT0_DIRECTION.set(constantAmbient ? LIGHT_0_NETHER : LIGHT_0_OVERWORLD);
+        }
+        if (shader.LIGHT1_DIRECTION != null) {
+            shader.LIGHT1_DIRECTION.set(constantAmbient ? LIGHT_1_NETHER : LIGHT_1_OVERWORLD);
+        }
+        shader.apply();
+    }
+
+    public static void setSharedUniforms(ShaderInstance shader, Matrix4f baseView, Matrix4f projection) {
         for (int i = 0; i < MAX_SAMPLERS; i++) {
             shader.setSampler("Sampler" + i, RenderSystem.getShaderTexture(i));
         }
@@ -196,15 +209,6 @@ public class MeshBatchRenderer implements AutoCloseable {
             shader.GAME_TIME.set(RenderSystem.getShaderGameTime());
         }
 
-        boolean constantAmbient = Minecraft.getInstance().level != null
-                && Minecraft.getInstance().level.effects().constantAmbientLight();
-        if (shader.LIGHT0_DIRECTION != null) {
-            shader.LIGHT0_DIRECTION.set(constantAmbient ? LIGHT_0_NETHER : LIGHT_0_OVERWORLD);
-        }
-        if (shader.LIGHT1_DIRECTION != null) {
-            shader.LIGHT1_DIRECTION.set(constantAmbient ? LIGHT_1_NETHER : LIGHT_1_OVERWORLD);
-        }
-        shader.apply();
     }
 
 }

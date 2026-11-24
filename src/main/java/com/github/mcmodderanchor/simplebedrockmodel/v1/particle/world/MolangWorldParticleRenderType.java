@@ -6,7 +6,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -30,6 +32,7 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
 
     private final ParticleDescription.Material material;
     private final ResourceLocation texture;
+    private WorldParticleCompute computeBatch;
 
     private MolangWorldParticleRenderType(ParticleDescription.Material material, ResourceLocation texture) {
         this.material = material;
@@ -49,6 +52,10 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
      */
     public static void clearCache() {
         CACHE.clear();
+    }
+
+    public static void invalidateCompute() {
+        WorldParticleCompute.invalidate();
     }
 
     @Override
@@ -84,11 +91,22 @@ public final class MolangWorldParticleRenderType implements ParticleRenderType {
         }
 
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+        computeBatch = WorldParticleCompute.begin(builder);
+    }
+
+    boolean collect(SnowStormParticle particle, VertexConsumer consumer, Camera camera, float partialTick) {
+        return computeBatch != null && computeBatch.collect(particle, consumer, camera, partialTick);
     }
 
     @Override
     public void end(Tesselator tesselator) {
-        tesselator.end();
+        var batch = computeBatch;
+        computeBatch = null;
+        if (batch == null) {
+            tesselator.end();
+        } else {
+            batch.end(tesselator);
+        }
     }
 
     @Override

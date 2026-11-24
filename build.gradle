@@ -51,6 +51,27 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
+            def particleBenchmarkDir = project.findProperty('sbmParticleBenchmarkDir')
+            if (particleBenchmarkDir != null) {
+                workingDirectory project.file(particleBenchmarkDir)
+                property 'sbm.worldParticleBenchmark', 'true'
+                property 'sbm.worldParticleBenchmark.smokeTick', project.hasProperty('sbmParticleBenchmarkSmokeTick').toString()
+                property 'sbm.worldParticleBenchmark.gpuPrototypes', project.hasProperty('sbmParticleBenchmarkGpuPrototypes').toString()
+                property 'sbm.worldParticleBenchmark.largeBatches', project.hasProperty('sbmParticleBenchmarkLargeBatches').toString()
+                property 'sbm.worldParticleBenchmark.cpuIsolation', project.hasProperty('sbmParticleBenchmarkCpuIsolation').toString()
+                property 'sbm.worldParticleBenchmark.productionCompute', project.hasProperty('sbmParticleBenchmarkProductionCompute').toString()
+                def shaderPack = project.findProperty('sbmParticleBenchmarkShaderPack')
+                if (shaderPack != null) {
+                    property 'sbm.worldParticleBenchmark.shaderPack', shaderPack.toString()
+                }
+                def cpuProfilerAgent = project.findProperty('sbmParticleBenchmarkCpuProfilerAgent')
+                if (cpuProfilerAgent != null) {
+                    property 'sbm.worldParticleBenchmark.cpuProfile', 'true'
+                    jvmArg "-agentpath:${cpuProfilerAgent}=start,event=cpu,interval=2ms,threads,jfr,file=cpu.jfr"
+                }
+                property 'forge.logging.console.level', 'info'
+                args '--width', '1280', '--height', '720'
+            }
         }
 
         client2 {
@@ -137,7 +158,9 @@ dependencies {
 //    runtimeOnly fg.deobf("curse.maven:timeless-and-classics-zero-1028108:8055552-sources-8055584")
 //
 //    runtimeOnly fg.deobf("dev.kosmx.player-anim:player-animation-lib-forge:1.0.2-rc1+1.20")
-    runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
+    if (project.findProperty('sbmParticleBenchmarkDir') == null || project.hasProperty('sbmParticleBenchmarkShaderPack')) {
+        runtimeOnly fg.deobf('libs:oculus:mc1.20.1-1.7.0')
+    }
     runtimeOnly fg.deobf('curse.maven:rubidium-extra-654373:6101745')
 //    runtimeOnly fg.deobf("curse.maven:accelerated-rendering-1314021:7342975")
 

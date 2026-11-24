@@ -4,6 +4,8 @@
 
 对应 `2.5.26-forge-mc1.20.1`。使用方法见 [即时／批量接口](static-mesh-api.md) 和 [世界渲染组](world-mesh-rendering.md)。
 
+动画骨骼、Iris 兼容和世界粒子的实验方向见 [渲染优化调查](../rendering-optimization-investigation.md)。
+
 ## 结构与职责
 
 包根为 `com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh`。调用方提供几何、不可变 key 和实例状态；SBM 管理捕获、缓存、上传、剔除与绘制。
