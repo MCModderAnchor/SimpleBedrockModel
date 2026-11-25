@@ -205,4 +205,33 @@ NeoForge 1.21.1 用 2,048 个固定 UV 粒子验证 `build()` 提交点。装 Ir
 
 解除材质限制后，Forge 1.20.1 和 NeoForge 1.21.1 分别用 Oculus 和 Iris 加载 BSL 受控配置。六种世界粒子材质各用 512 个固定 UV 粒子对照。日志逐种确认 compute 实际提交。十二对 CPU 与 compute 截图均逐像素一致，各场景的粒子在无粒子对照中均可辨认。[Forge 材质对照](../../build/world-particle-material-check/forge/game-4fce679e5a8a441e82be14eec4f6e660/summary.txt) · [NeoForge 材质对照](../../build/world-particle-material-check/neoforge/game-1175540b48574acd9dc2dbb473bfb2fb/summary.txt)
 
+## LOOKAT 朝向的 CPU 和 GPU 求轴
+
+Forge 1.20.1、Oculus 1.7.0、BSL v8.4.01.2 受控配置，RTX 4060 Laptop，1280×720，无帧率上限。每批固定数量和位置，只使用一种朝向。两条 compute 共用 80 B 输入记录，同一内核写出 `PARTICLE` 顶点。CPU 求轴路径调用现有 `applyFacingMode()`，GPU 求轴路径读取最新 tick 的相机相对位置与速度。粒子的自旋和方向组速度由同一个种子生成。
+
+默认背面剔除下，4,096 粒子组把求轴移至 GPU 后，三轮配对的 CPU 耗时分别省了 0.326–0.356 ms/帧（XYZ）、0.374–0.387 ms/帧（Y）和 0.596–0.621 ms/帧（DIRECTION）。空场景对照显示，1.20.1 当前 CPU 绕序使本场景的 `LOOKAT_XYZ`、`LOOKAT_Y` 被背面剔除。后续的画面和性能对照在测试批次关闭背面剔除，结束后恢复。
+
+下表为 12,000 个可见粒子。CPU 列为粒子准备加提交 P50，末两列为 CPU 求轴 → GPU 求轴，单位均为 ms，取三轮中位数。Oculus 的两个粒子阶段按帧合计。
+
+| 朝向 | Embeddium CPU | CPU 求轴＋compute CPU | GPU 求轴＋compute CPU | GPU 批次 P50 | 整帧 P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `LOOKAT_XYZ` | 1.913 | 1.533 | 0.477 | 0.266 → 0.323 | 3.654 → 2.024 |
+| `LOOKAT_Y` | 2.189 | 1.590 | 0.538 | 0.271 → 0.312 | 3.819 → 1.788 |
+| `LOOKAT_DIRECTION` | 2.726 | 2.221 | 0.572 | 0.258 → 0.306 | 4.719 → 1.872 |
+
+首轮截图中，`LOOKAT_XYZ` 和 `LOOKAT_Y` 的粒子区域均与 CPU 路径逐像素一致，XYZ 的整图差异全部来自底部的加载进度条。`LOOKAT_DIRECTION` 的 GPU 求轴组有 14 个差异像素，其中 1 个像素最大通道差超过 4/255，最大差为 35/255。当前对照覆盖固定位置、单朝向批次。进入正式路径前，还需核对混合朝向、运动位置和各版本正面绕序。[默认剔除结果](../../build/world-particle-benchmark/run-fc153188322c42a0b81e098235a503ea/particle-results-15295177803877510974/summary.txt) · [可见粒子结果](../../build/world-particle-benchmark/run-6541e1b99ea4412489757adc03dd27bb/particle-results-9278188782198944065/summary.txt)
+
+## 正式路径混合朝向复测
+
+Forge 1.20.1 在同一 BSL 受控场景使用 `-ProductionCompute -FacingModes -FacingTwoSided`，测 12,000 个固定位置粒子，跑三轮。混合批次先放四分之一 `ROTATE_XYZ`，后续按队列交替使用 `ROTATE_XYZ` 和三种 `LOOKAT_*`。纯批次使用 48 B/粒子的基础记录，混合批次追加 32 B/粒子的朝向记录。日志分别确认了两种批次实际命中 compute，首轮两对截图均逐像素一致。
+
+| 朝向配置 | CPU 准备和提交 P50（ms/帧） | GPU 批次 P50（ms/帧） | 整帧 P95（ms） |
+| --- | ---: | ---: | ---: |
+| 纯 `ROTATE_XYZ` | 1.470 → 0.470 | 0.293 → 0.263 | 4.044 → 3.147 |
+| 四种朝向混合 | 1.887 → 0.533 | 0.277 → 0.321 | 4.411 → 2.687 |
+
+箭头为 Embeddium → 正式 compute，取各轮分位数的中位数。测试临时关闭背面剔除，使 1.20.1 原有 LOOKAT 绕序下的粒子也出现在画面对照中。[原始结果与截图](../../build/world-particle-benchmark/run-6b1d8a458190490eab5dde6565ba19c5/particle-results-501695904951889272)
+
+NeoForge 1.21.1 使用 Iris 和同一 BSL 配置，在默认剔除状态下对照 2,048 粒子。混合组含非零速度的 `LOOKAT_DIRECTION` 粒子，同批保持原顺序，两条路径在相同 tick 端点取图。纯批次和混合批次均确认了正式 compute 提交，两对截图均逐像素一致。[1.21.1 对照结果](../../build/world-particle-mixed-lookat-1.21/game-efa684a6bed24cadad446600ff8440c8/summary.txt)
+
 [试验方案](experiments.md) · [当前结论](conclusions.md)

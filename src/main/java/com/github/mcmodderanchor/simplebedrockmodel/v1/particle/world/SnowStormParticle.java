@@ -325,8 +325,17 @@ public class SnowStormParticle extends TextureSheetParticle {
     }
 
     public boolean supportsCompute() {
-        return faceCameraMode == ParticleAppearanceBillboard.FaceCameraMode.ROTATE_XYZ
-                && !followAnchor && !fovCompensatedWorldParticle;
+        return !followAnchor && !fovCompensatedWorldParticle && computeFacingMode() >= 0;
+    }
+
+    public int computeFacingMode() {
+        return switch (faceCameraMode) {
+            case ROTATE_XYZ -> 0;
+            case LOOKAT_XYZ -> 1;
+            case LOOKAT_Y -> 2;
+            case LOOKAT_DIRECTION -> 3;
+            default -> -1;
+        };
     }
 
     public void writeComputeRecord(long address, Vec3 eye, float partialTick) {
@@ -335,6 +344,11 @@ public class SnowStormParticle extends TextureSheetParticle {
                 (float) (Mth.lerp(partialTick, yo, y) - eye.y),
                 (float) (Mth.lerp(partialTick, zo, z) - eye.z),
                 Mth.lerp(partialTick, oRoll, roll), particleData, rCol, gCol, bCol, alpha, getLightColor(partialTick));
+    }
+
+    public void writeComputeFacing(long address, Vec3 eye, int mode) {
+        WorldParticleCompute.writeFacing(address, mode,
+                (float) (eye.x - x), (float) (eye.y - y), (float) (eye.z - z), particleData);
     }
 
     public void renderCpu(VertexConsumer buffer, Camera camera, float partialTicks) {

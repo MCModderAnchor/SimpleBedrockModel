@@ -1,0 +1,93 @@
+#version 430 core
+
+layout(local_size_x = 128) in;
+
+struct Particle {
+    vec4 centerRoll;
+    vec2 halfSize;
+    uint color;
+    uint light;
+    vec4 uvBounds;
+    vec4 axisXOrToCamera;
+    vec4 axisYOrVelocity;
+};
+
+struct Vertex {
+    float x;
+    float y;
+    float z;
+    float u;
+    float v;
+    uint color;
+    uint light;
+};
+
+layout(std430, binding = 0) readonly restrict buffer Particles {
+    Particle particles[];
+};
+
+layout(std430, binding = 1) writeonly restrict buffer Vertices {
+    Vertex vertices[];
+};
+
+layout(location = 0) uniform uint ParticleCount;
+layout(location = 1) uniform vec3 CameraRight;
+layout(location = 2) uniform vec3 CameraUp;
+layout(location = 3) uniform int GpuFacingMode;
+
+void computeAxes(Particle p, out vec3 axisX, out vec3 axisY) {
+    if (GpuFacingMode == 0) {
+        axisX = p.axisXOrToCamera.xyz;
+        axisY = p.axisYOrVelocity.xyz;
+        return;
+    }
+
+    vec3 right = CameraRight;
+    vec3 up = CameraUp;
+    vec3 toCamera = p.axisXOrToCamera.xyz;
+    if (GpuFacingMode == 3) {
+        vec3 velocity = p.axisYOrVelocity.xyz;
+        if (dot(velocity, velocity) > 1e-8) {
+            right = normalize(velocity);
+            vec3 normal = toCamera - right * dot(toCamera, right);
+            if (dot(normal, normal) > 1e-12) {
+                up = normalize(cross(normal, right));
+            } else {
+                vec3 reference = abs(right.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0);
+                up = normalize(reference - right * dot(reference, right));
+            }
+        }
+    } else {
+        if (GpuFacingMode == 2) toCamera.y = 0;
+        vec3 lateral = cross(vec3(0, 1, 0), toCamera);
+        if (dot(lateral, lateral) > 1e-12) {
+            right = normalize(lateral);
+            up = cross(normalize(toCamera), right);
+        }
+    }
+
+    float c = cos(p.centerRoll.w);
+    float s = sin(p.centerRoll.w);
+    axisX = (right * c + up * s) * p.halfSize.x;
+    axisY = (up * c - right * s) * p.halfSize.y;
+}
+
+void putVertex(uint index, vec3 position, vec2 uv, uint color, uint light) {
+    vertices[index] = Vertex(position.x, position.y, position.z, uv.x, uv.y, color, light);
+}
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= ParticleCount) return;
+
+    Particle p = particles[index];
+    vec3 x, y;
+    computeAxes(p, x, y);
+    vec3 center = p.centerRoll.xyz;
+    vec4 uv = p.uvBounds;
+    uint base = index * 4u;
+    putVertex(base,      center - x - y, uv.xw, p.color, p.light);
+    putVertex(base + 1u, center - x + y, uv.xy, p.color, p.light);
+    putVertex(base + 2u, center + x + y, uv.zy, p.color, p.light);
+    putVertex(base + 3u, center + x - y, uv.zw, p.color, p.light);
+}

@@ -16,6 +16,7 @@
 | CPU 热点隔离 | 在 24,000 和 96,000 个全部可见的小粒子上，比较实例化基线、跳过逐粒子视锥检查、按地址写记录、两项合用，以及跳过检查后用直接循环替代引擎逐粒子分发。五条路径共用 shader、48 B 布局和粒子 tick。 |
 | Oculus 光影 | 对比 Embeddium 与自写 compute。每个光影包测三轮，覆盖 4,096 小粒子、12,000 小粒子和 12,000 大粒子。按帧合计各绘制阶段的 CPU 和 GPU 时间。在合成后截取每轮 12,000 粒子的最终画面。 |
 | Oculus 翻页烟雾 | 同时指定光影包和烟雾模式。两条路径都更新原烟雾组件，测试 4,096 和 12,000 粒子。第 4、14 粒子 tick 在相同插值端点截图并记录首粒子的 UV。正式计时使用正常帧插值。 |
+| LOOKAT 求轴 | 对照 Embeddium、CPU 求轴后 GPU 展开、GPU 求轴并展开。三种 LOOKAT 朝向各测 4,096 和 12,000 粒子，跑三轮并轮换后端顺序。每批仅一种朝向。 |
 
 CPU 准备覆盖批次遍历、可见性检查、解算和打包。CPU 提交单独计量。GPU `GL_TIME_ELAPSED` 查询覆盖整个批次，包含上传、compute 和 draw，也可能包含 CPU 提交期间的 GPU 空闲。粒子更新以 ms/tick 计，使用同一采样窗口内的累计时间比较 tick 与渲染。大批次轮和 CPU 热点隔离轮关闭 profiler，CPU 栈的比例来自采样次数。[测量表与输出](measurements.md)
 
@@ -44,11 +45,18 @@ CPU 准备覆盖批次遍历、可见性检查、解算和打包。CPU 提交单
 ./tools/run_world_particle_benchmark.ps1 -Uncapped -CpuProfilerAgent '<IntelliJ 安装路径>/lib/async-profiler/amd64/libasyncProfiler.dll'
 ./tools/run_world_particle_benchmark.ps1 -Uncapped -ShaderPack 'run/shaderpacks/BSL_v8.4.01.2.zip'
 ./tools/run_world_particle_benchmark.ps1 -SmokeTick -Uncapped -ShaderPack 'run/shaderpacks/BSL_v8.4.01.2.zip' -ShaderPackOptions 'build/world-particle-benchmark/bsl-static-visual.properties'
+./tools/run_world_particle_benchmark.ps1 -FacingModes -Uncapped -ShaderPack 'run/shaderpacks/BSL_v8.4.01.2.zip' -ShaderPackOptions 'build/world-particle-benchmark/bsl-static-visual.properties'
 ```
 
 `-ShaderPack` 接受 ZIP 或解压后的光影包目录。脚本把光影包与可选的 `-ShaderPackOptions` 配置文件复制到隔离客户端。`shader-selection.csv` 记录各阶段的选中程序和 `GameRenderer.getParticleShader()` 的返回值。
 
 `-ProductionCompute` 使用正式的 `SnowStormParticle` 批次入口对照 Embeddium。加上 `-SmokeTick` 时，还会在同一材质和纹理的队列中插入一个 `ROTATE_Y` 粒子，检查整个批次按原顺序回放。命令可以与 `-ShaderPack` 合用。
+
+`-FacingModes` 的两条 compute 路径共用 80 B 输入记录和标准粒子输出。CPU 求轴调用现有 `applyFacingMode()` 并写入已应用自旋和半尺寸的两轴。GPU 求轴写入最新 tick 的相机相对位置与速度。方向组用固定位置和确定的速度输入，包括每八个粒子一个零速度样本。正式渲染入口的朝向支持由其自身判断。[对照着色器](../../src/main/resources/assets/example/shaders/core/world_particle_look_at.comp)
+
+加 `-FacingTwoSided` 时只跑 12,000 粒子组，临时关闭测试批次的背面剔除，批次结束后恢复之前的状态。画面以空场景为对照，确认粒子实际可见后再比较两条求轴路径。
+
+将 `-FacingModes` 与 `-ProductionCompute` 合用时，改为比较纯 `ROTATE_XYZ` 和混合朝向批次的正式提交。混合组的前四分之一只用 `ROTATE_XYZ`，其余粒子交替使用四种已支持的朝向。这样覆盖先暂存相机朝向、随后开始上传朝向记录的情况，并在后续轮次验证切回纯批次。
 
 翻页截图的 BSL 配置为 `TAA=false`、`CLOUDS=0` 和 `LIGHT_SHAFT=false`，每个选项在配置文件中独占一行。
 

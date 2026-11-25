@@ -8,7 +8,9 @@ param(
     [string]$CpuProfilerAgent,
     [string]$ShaderPack,
     [string]$ShaderPackOptions,
-    [switch]$ProductionCompute
+    [switch]$ProductionCompute,
+    [switch]$FacingModes,
+    [switch]$FacingTwoSided
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,6 +22,10 @@ if (($ShaderPack -or $ProductionCompute) -and ($GpuPrototypes -or $LargeBatches 
     throw '-ShaderPack and -ProductionCompute select the Embeddium and self-written compute comparison.'
 }
 if ($ShaderPackOptions -and !$ShaderPack) { throw '-ShaderPackOptions requires -ShaderPack.' }
+if ($FacingModes -and ($SmokeTick -or $GpuPrototypes -or $LargeBatches -or $CpuIsolation -or $CpuProfilerAgent)) {
+    throw '-FacingModes selects the look-at orientation comparison.'
+}
+if ($FacingTwoSided -and !$FacingModes) { throw '-FacingTwoSided requires -FacingModes.' }
 $pack = if ($ShaderPack) { Get-Item -LiteralPath $ShaderPack }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $encoding = [System.Text.UTF8Encoding]::new($false)
@@ -35,8 +41,11 @@ New-Item -ItemType File -Path (Join-Path $benchmarkRun '.sbm-particle-benchmark'
 ), $encoding)
 $previousJavaHome = $env:JAVA_HOME
 $gradleArguments = @('--offline', "-PsbmParticleBenchmarkDir=$benchmarkRun")
+$facingCases = if ($FacingTwoSided) { if ($ProductionCompute) { 12 } else { 27 } } else { if ($ProductionCompute) { 24 } else { 54 } }
 if ($SmokeTick) { $gradleArguments += '-PsbmParticleBenchmarkSmokeTick' }
 if ($ProductionCompute) { $gradleArguments += '-PsbmParticleBenchmarkProductionCompute' }
+if ($FacingModes) { $gradleArguments += '-PsbmParticleBenchmarkFacingModes' }
+if ($FacingTwoSided) { $gradleArguments += '-PsbmParticleBenchmarkFacingTwoSided' }
 $expectedCases = if ($pack) {
     $packName = $pack.Name
     $shaderPacksDir = New-Item -ItemType Directory -Path (Join-Path $benchmarkRun 'shaderpacks')
@@ -49,7 +58,9 @@ $expectedCases = if ($pack) {
         'enableShaders=true', "shaderPack=$packName"
     ), $encoding)
     $gradleArguments += "-PsbmParticleBenchmarkShaderPack=$packName"
-    if ($SmokeTick -and $ProductionCompute) { 14 } elseif ($SmokeTick) { 12 } else { 18 }
+    if ($FacingModes) { $facingCases } elseif ($SmokeTick -and $ProductionCompute) { 14 } elseif ($SmokeTick) { 12 } else { 18 }
+} elseif ($FacingModes) {
+    $facingCases
 } elseif ($ProductionCompute) {
     if ($SmokeTick) { 14 } else { 18 }
 } elseif ($SmokeTick) {
@@ -79,8 +90,8 @@ try {
         (Get-ChildItem -LiteralPath $results.FullName -File -Filter '*-ticks.csv').Count -ne $expectedCases) {
         throw "The world particle benchmark did not complete. See $benchmarkRun/logs/latest.log."
     }
-    if ($pack -or $ProductionCompute) {
-        $expectedImages = if ($SmokeTick) { 2 * $expectedCases + 1 } else { 13 }
+    if ($pack -or $ProductionCompute -or $FacingModes) {
+        $expectedImages = if ($FacingModes -and $ProductionCompute) { 5 } elseif ($FacingModes) { 10 } elseif ($SmokeTick) { 2 * $expectedCases + 1 } else { 13 }
         if (($pack -and (Import-Csv -LiteralPath (Join-Path $results.FullName 'shader-selection.csv') | Group-Object case).Count -ne $expectedCases) -or
             (Get-ChildItem -LiteralPath $results.FullName -File -Filter 'verify-*.png').Count -ne $expectedImages) {
             throw "The shader benchmark did not capture every shader selection or comparison image in $benchmarkRun."
@@ -96,6 +107,9 @@ try {
         }
         if ($SmokeTick -and !(Select-String -LiteralPath $debugLog -SimpleMatch 'World particle compute is replaying 2048 staged particles in order' -Quiet)) {
             throw "The production compute path did not replay the mixed batch in $benchmarkRun."
+        }
+        if ($FacingModes -and !(Select-String -LiteralPath $debugLog -SimpleMatch 'World particle compute submitted its first batch with LOOKAT' -Quiet)) {
+            throw "The production compute path did not submit the mixed-facing batch in $benchmarkRun."
         }
     }
     if ($CpuProfilerAgent) {

@@ -6,7 +6,9 @@ import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleDes
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.ParticleEffectDefinition;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.IComponent;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.ParticleAppearanceBillboard;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.ParticleAppearanceBillboard.FaceCameraMode;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.tinting.ParticleTintingGradient;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.molang.runtime.MolangExpression;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.resource.ParticleDefinitionLoader;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleEmitterInstance;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
@@ -67,6 +69,7 @@ import java.util.AbstractQueue;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -84,9 +87,13 @@ public final class ExampleWorldParticleBenchmark {
     private static final boolean CPU_ISOLATION = Boolean.getBoolean("sbm.worldParticleBenchmark.cpuIsolation");
     private static final String SHADER_PACK = System.getProperty("sbm.worldParticleBenchmark.shaderPack");
     private static final boolean PRODUCTION_COMPUTE = Boolean.getBoolean("sbm.worldParticleBenchmark.productionCompute");
-    private static final boolean COMPUTE_COMPARISON = SHADER_PACK != null || PRODUCTION_COMPUTE;
+    private static final boolean FACING_BENCHMARK = Boolean.getBoolean("sbm.worldParticleBenchmark.facingModes");
+    private static final boolean FACING_TWO_SIDED = FACING_BENCHMARK && Boolean.getBoolean("sbm.worldParticleBenchmark.facingTwoSided");
+    private static final boolean COMPUTE_COMPARISON = SHADER_PACK != null || PRODUCTION_COMPUTE || FACING_BENCHMARK;
     private static final boolean COMPUTE_SMOKE = COMPUTE_COMPARISON && SMOKE_TICK;
     private static final int[] FLIPBOOK_CAPTURE_TICKS = {4, 14};
+    private static final FaceCameraMode[] MIXED_FACING_MODES = {FaceCameraMode.ROTATE_XYZ, FaceCameraMode.LOOKAT_XYZ,
+            FaceCameraMode.LOOKAT_Y, FaceCameraMode.LOOKAT_DIRECTION};
     private static final boolean LARGE_BATCHES = CPU_PROFILE || CPU_ISOLATION
             || Boolean.getBoolean("sbm.worldParticleBenchmark.largeBatches");
     private static final boolean GPU_PROTOTYPES = LARGE_BATCHES || Boolean.getBoolean("sbm.worldParticleBenchmark.gpuPrototypes");
@@ -118,6 +125,7 @@ public final class ExampleWorldParticleBenchmark {
     private final ParticleGpuPrototype.Instanced instanced;
     private final ParticleGpuPrototype.ArCompute arCompute;
     private final ParticleGpuPrototype.CustomCompute customCompute;
+    private final ParticleGpuPrototype.LookAtCompute lookAtCompute;
     private final ParticleRenderType renderType = new ParticleRenderType() {
         @Override
         public void begin(BufferBuilder builder, TextureManager textures) {
@@ -130,6 +138,7 @@ public final class ExampleWorldParticleBenchmark {
             try {
                 batch.end(tesselator);
             } finally {
+                batch.restoreFacingCull();
                 renderLeaderOnly = false;
             }
         }
@@ -154,8 +163,10 @@ public final class ExampleWorldParticleBenchmark {
                 + "\nframe_limit=" + (uncapped ? "unlimited" : minecraft.getWindow().getFramerateLimit())
                 + "\nvsync=" + minecraft.options.enableVsync().get()
                 + "\nsmoke_tick=" + SMOKE_TICK
-                + "\ngpu_prototypes=" + (GPU_PROTOTYPES || (SHADER_PACK != null && !PRODUCTION_COMPUTE))
+                + "\ngpu_prototypes=" + (GPU_PROTOTYPES || (COMPUTE_COMPARISON && !PRODUCTION_COMPUTE))
                 + "\nproduction_compute=" + PRODUCTION_COMPUTE
+                + "\nfacing_modes=" + FACING_BENCHMARK
+                + "\nfacing_two_sided=" + FACING_TWO_SIDED
                 + "\nlarge_batches=" + LARGE_BATCHES
                 + "\ncpu_profile=" + CPU_PROFILE
                 + "\ncpu_isolation=" + CPU_ISOLATION
@@ -170,6 +181,11 @@ public final class ExampleWorldParticleBenchmark {
                 || GL15.glGetQueryi(GL33.GL_TIME_ELAPSED, GL15.GL_QUERY_COUNTER_BITS) == 0) {
             throw new IllegalStateException("Embeddium and OpenGL timer queries are required for this benchmark");
         }
+        if (FACING_BENCHMARK && !GL.getCapabilities().OpenGL45) {
+            throw new IllegalStateException("The facing benchmark requires OpenGL 4.5");
+        }
+        this.lookAtCompute = FACING_BENCHMARK && !PRODUCTION_COMPUTE
+                ? new ParticleGpuPrototype.LookAtCompute(GPU_CAPACITY, minecraft.getResourceManager()) : null;
         if (COMPUTE_COMPARISON) {
             if (!GL.getCapabilities().OpenGL45) {
                 throw new IllegalStateException("The GPU benchmark uses OpenGL 4.5 vertex and buffer setup");
@@ -189,9 +205,15 @@ public final class ExampleWorldParticleBenchmark {
             captureSnapshot(output.resolve("verify-empty.png"));
             this.instanced = null;
             this.arCompute = null;
-            this.customCompute = PRODUCTION_COMPUTE ? null : new ParticleGpuPrototype.CustomCompute(GPU_CAPACITY,
+            this.customCompute = PRODUCTION_COMPUTE || FACING_BENCHMARK ? null : new ParticleGpuPrototype.CustomCompute(GPU_CAPACITY,
                     ParticleGpuPrototype.CustomCompute.loadProgram(minecraft.getResourceManager()));
-            addComputeScenarios();
+            if (FACING_BENCHMARK && PRODUCTION_COMPUTE) {
+                addProductionFacingScenarios();
+            } else if (FACING_BENCHMARK) {
+                addFacingScenarios();
+            } else {
+                addComputeScenarios();
+            }
         } else if (CPU_ISOLATION) {
             if (!GL.getCapabilities().OpenGL45) {
                 throw new IllegalStateException("The GPU benchmark uses OpenGL 4.5 vertex and buffer setup");
@@ -341,6 +363,36 @@ public final class ExampleWorldParticleBenchmark {
         }
     }
 
+    private void addFacingScenarios() {
+        Renderer[] renderers = {Renderer.EMBEDDIUM, Renderer.CPU_AXES_COMPUTE, Renderer.GPU_AXES_COMPUTE};
+        FaceCameraMode[] modes = {FaceCameraMode.LOOKAT_XYZ, FaceCameraMode.LOOKAT_Y, FaceCameraMode.LOOKAT_DIRECTION};
+        int[] counts = FACING_TWO_SIDED ? new int[]{MAX_TEST_PARTICLES} : new int[]{4096, MAX_TEST_PARTICLES};
+        for (int repeat = 1; repeat <= REPEATS; repeat++) {
+            for (FaceCameraMode mode : modes) {
+                for (int count : counts) {
+                    for (int i = 0; i < renderers.length; i++) {
+                        Renderer renderer = renderers[(i + repeat - 1) % renderers.length];
+                        scenarios.add(new Scenario(repeat, count, 0.085f, renderer, Workload.STATIC, CpuVariant.STOCK, mode));
+                    }
+                }
+            }
+        }
+    }
+
+    private void addProductionFacingScenarios() {
+        int[] counts = FACING_TWO_SIDED ? new int[]{MAX_TEST_PARTICLES} : new int[]{4096, MAX_TEST_PARTICLES};
+        for (int repeat = 1; repeat <= REPEATS; repeat++) {
+            Renderer first = repeat % 2 == 1 ? Renderer.EMBEDDIUM : Renderer.CUSTOM_COMPUTE;
+            Renderer second = first == Renderer.EMBEDDIUM ? Renderer.CUSTOM_COMPUTE : Renderer.EMBEDDIUM;
+            for (int count : counts) {
+                for (Workload workload : new Workload[]{Workload.STATIC, Workload.MIXED_FACING}) {
+                    scenarios.add(new Scenario(repeat, count, 0.085f, first, workload));
+                    scenarios.add(new Scenario(repeat, count, 0.085f, second, workload));
+                }
+            }
+        }
+    }
+
     private void addCpuIsolationScenarios() {
         CpuVariant[] variants = CpuVariant.values();
         for (int repeat = 1; repeat <= REPEATS; repeat++) {
@@ -439,21 +491,34 @@ public final class ExampleWorldParticleBenchmark {
         if (instanced != null) instanced.close();
         if (arCompute != null) arCompute.close();
         if (customCompute != null) customCompute.close();
+        if (lookAtCompute != null) lookAtCompute.close();
     }
 
     private void nextScenario() {
         Scenario scenario = scenarios.get(scenarioIndex++);
         if (PRODUCTION_COMPUTE) WorldParticleConfig.COMPUTE.set(scenario.renderer == Renderer.CUSTOM_COMPUTE);
-        ParticleEffectDefinition definition = definitionFor(scenario.workload);
+        ParticleEffectDefinition definition = scenario.facingMode == null ? definitionFor(scenario.workload)
+                : facingDefinition(scenario.facingMode, scenario.halfSize);
         ParticleEffectDefinition mixedDefinition = scenario.workload == Workload.MIXED_SMOKE ? rotateY(definition) : definition;
+        Map<FaceCameraMode, ParticleEffectDefinition> facingDefinitions = new EnumMap<>(FaceCameraMode.class);
+        if (scenario.workload == Workload.MIXED_FACING) {
+            for (FaceCameraMode mode : MIXED_FACING_MODES) {
+                facingDefinitions.put(mode, facingDefinition(mode, scenario.halfSize));
+            }
+        }
         ParticleGpuPrototype prototype = switch (scenario.renderer) {
             case INSTANCED -> instanced;
             case AR_COMPUTE -> arCompute;
             case CUSTOM_COMPUTE -> customCompute;
+            case CPU_AXES_COMPUTE, GPU_AXES_COMPUTE -> lookAtCompute;
             default -> null;
         };
+        if (prototype instanceof ParticleGpuPrototype.LookAtCompute facing) {
+            facing.setFacingMode(scenario.facingMode, scenario.renderer == Renderer.GPU_AXES_COMPUTE);
+        }
         if (CPU_ISOLATION) instanced.setRawRecordWrites(scenario.cpuVariant.rawWrites);
         Path snapshot = COMPUTE_COMPARISON && !COMPUTE_SMOKE && scenario.count == GPU_CAPACITY
+                && (!FACING_BENCHMARK || scenario.repeat == 1)
                 ? output.resolve("verify-" + scenario.coverage() + "-" + scenario.resultMode() + "-" + scenario.repeat + ".png")
                 : GPU_PROTOTYPES && !CPU_PROFILE && scenario.repeat == 1 && scenario.count == GPU_CAPACITY
                 ? output.resolve("verify-" + scenario.coverage() + "-" + scenario.resultMode() + ".png") : null;
@@ -481,6 +546,15 @@ public final class ExampleWorldParticleBenchmark {
             particle.v1 = 0.125f;
             particle.a = 0.7f;
             particle.rotation = (float) random.nextDouble(-180, 180);
+            FaceCameraMode facingMode = scenario.workload == Workload.MIXED_FACING
+                    ? MIXED_FACING_MODES[i < scenario.count / 4 ? 0 : i % MIXED_FACING_MODES.length]
+                    : scenario.facingMode;
+            int zeroVelocityIndex = scenario.workload == Workload.MIXED_FACING ? 3 : 0;
+            if (facingMode == FaceCameraMode.LOOKAT_DIRECTION && i % 8 != zeroVelocityIndex) {
+                particle.vx = (float) random.nextDouble(-1, 1);
+                particle.vy = (float) random.nextDouble(-1, 1);
+                particle.vz = (float) random.nextDouble(-1, 1);
+            }
             if (SMOKE_TICK) {
                 // Keep a fixed population and distribute particles across flipbook frames and color stops.
                 particle.emitter = emitter;
@@ -494,7 +568,8 @@ public final class ExampleWorldParticleBenchmark {
                 particle.vx = particle.vy = particle.vz = 0;
                 particle.rotationRate = (float) random.nextDouble(-90, 90);
             }
-            ParticleEffectDefinition particleDefinition = i == scenario.count / 2 ? mixedDefinition : definition;
+            ParticleEffectDefinition particleDefinition = scenario.workload == Workload.MIXED_FACING
+                    ? facingDefinitions.get(facingMode) : (i == scenario.count / 2 ? mixedDefinition : definition);
             var worldParticle = new BenchParticle(level, particle, particleDefinition, emitter, batch,
                     renderType, i == 0, i == scenario.count - 1);
             batch.particles.add(worldParticle);
@@ -527,6 +602,14 @@ public final class ExampleWorldParticleBenchmark {
                 smoke.getCurves(), smoke.getEvents());
     }
 
+    private static ParticleEffectDefinition facingDefinition(FaceCameraMode mode, float size) {
+        var halfSize = MolangExpression.constant(size);
+        var billboard = new ParticleAppearanceBillboard(new MolangExpression[]{halfSize, halfSize},
+                mode, null, null, false);
+        return new ParticleEffectDefinition(ID, new ParticleDescription(ID, MATERIAL, TEXTURE, 0, 0),
+                List.of(billboard), null, null);
+    }
+
     private static ParticleEffectDefinition rotateY(ParticleEffectDefinition smoke) {
         List<IComponent> components = new ArrayList<>(smoke.emitterPreset().components());
         for (var component : smoke.particlePreset().components()) {
@@ -543,7 +626,7 @@ public final class ExampleWorldParticleBenchmark {
     }
 
     private enum Workload {
-        STATIC, BASELINE, SMOKE_MOLANG, SMOKE_JAVA, MIXED_SMOKE;
+        STATIC, BASELINE, SMOKE_MOLANG, SMOKE_JAVA, MIXED_SMOKE, MIXED_FACING;
 
         private boolean smoke() {
             return this == SMOKE_MOLANG || this == SMOKE_JAVA || this == MIXED_SMOKE;
@@ -551,7 +634,7 @@ public final class ExampleWorldParticleBenchmark {
     }
 
     private enum Renderer {
-        VERTEX_CONSUMER, EMBEDDIUM, INSTANCED, AR_COMPUTE, CUSTOM_COMPUTE;
+        VERTEX_CONSUMER, EMBEDDIUM, INSTANCED, AR_COMPUTE, CUSTOM_COMPUTE, CPU_AXES_COMPUTE, GPU_AXES_COMPUTE;
 
         String label() {
             return name().toLowerCase(Locale.ROOT).replace('_', '-');
@@ -572,12 +655,18 @@ public final class ExampleWorldParticleBenchmark {
     }
 
     private record Scenario(int repeat, int count, float halfSize, Renderer renderer, Workload workload,
-                            CpuVariant cpuVariant) {
+                            CpuVariant cpuVariant, FaceCameraMode facingMode) {
+        Scenario(int repeat, int count, float halfSize, Renderer renderer, Workload workload, CpuVariant cpuVariant) {
+            this(repeat, count, halfSize, renderer, workload, cpuVariant, null);
+        }
+
         Scenario(int repeat, int count, float halfSize, Renderer renderer, Workload workload) {
             this(repeat, count, halfSize, renderer, workload, CpuVariant.STOCK);
         }
 
         String coverage() {
+            if (facingMode != null) return facingMode.name().toLowerCase(Locale.ROOT);
+            if (workload == Workload.MIXED_FACING) return "mixed_facing";
             return halfSize > 0.1f ? "dense" : "sparse";
         }
 
@@ -622,7 +711,18 @@ public final class ExampleWorldParticleBenchmark {
         @Override
         public void tick() {
             if (first) batch.tickStart = System.nanoTime();
-            super.tick();
+            if (FACING_BENCHMARK && (batch.scenario.facingMode == FaceCameraMode.LOOKAT_DIRECTION
+                    || batch.scenario.workload == Workload.MIXED_FACING)) {
+                // Supply a reproducible facing velocity while keeping the visual fixture stationary.
+                float vx = data.vx, vy = data.vy, vz = data.vz;
+                data.vx = data.vy = data.vz = 0;
+                super.tick();
+                data.vx = vx;
+                data.vy = vy;
+                data.vz = vz;
+            } else {
+                super.tick();
+            }
             if (last) {
                 if (batch.measuring()) batch.particleTickNs = System.nanoTime() - batch.tickStart;
                 if (COMPUTE_SMOKE) batch.particleTicks++;
@@ -653,6 +753,10 @@ public final class ExampleWorldParticleBenchmark {
             if (COMPUTE_SMOKE && batch.flipbookCaptureReady) partialTicks = 1f;
             if (batch.prototype == null) {
                 super.render(consumer, camera, partialTicks);
+            } else if (batch.prototype instanceof ParticleGpuPrototype.LookAtCompute facing) {
+                facing.pushFacing(this, camera, x, y, z,
+                        Mth.lerp(partialTicks, xo, x), Mth.lerp(partialTicks, yo, y), Mth.lerp(partialTicks, zo, z),
+                        Mth.lerp(partialTicks, oRoll, roll), data, rCol, gCol, bCol, alpha, getLightColor(partialTicks));
             } else {
                 batch.prototype.push(camera, Mth.lerp(partialTicks, xo, x), Mth.lerp(partialTicks, yo, y),
                         Mth.lerp(partialTicks, zo, z), Mth.lerp(partialTicks, oRoll, roll), data,
@@ -693,6 +797,7 @@ public final class ExampleWorldParticleBenchmark {
         private Instant profileStart;
         private Instant profileEnd;
         private boolean originalSodium;
+        private boolean restoreCull;
 
         private Batch(Scenario scenario, boolean uncapped, ParticleDescription description,
                       ParticleGpuPrototype prototype, Path snapshot) {
@@ -756,6 +861,10 @@ public final class ExampleWorldParticleBenchmark {
             if (scenario.renderer == Renderer.EMBEDDIUM && !(builder instanceof VertexBufferWriter)) {
                 throw new IllegalStateException("Embeddium fast vertex writer is unavailable");
             }
+            if (FACING_TWO_SIDED) {
+                restoreCull = GL11.glIsEnabled(GL11.GL_CULL_FACE);
+                RenderSystem.disableCull();
+            }
             originalSodium = SodiumCompat.IS_SODIUM_INSTALLED;
             // This flag is scoped to the test's batch on the render thread.
             SodiumCompat.IS_SODIUM_INSTALLED = scenario.renderer == Renderer.EMBEDDIUM || PRODUCTION_COMPUTE;
@@ -769,6 +878,11 @@ public final class ExampleWorldParticleBenchmark {
             }
             rendered = 0;
             renderStart = System.nanoTime();
+        }
+
+        private void restoreFacingCull() {
+            if (restoreCull) RenderSystem.enableCull();
+            restoreCull = false;
         }
 
         private void end(Tesselator tesselator) {

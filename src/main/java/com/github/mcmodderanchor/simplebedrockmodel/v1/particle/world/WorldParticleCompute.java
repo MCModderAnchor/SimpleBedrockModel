@@ -36,6 +36,7 @@ public class WorldParticleCompute {
     private static final ResourceLocation KERNEL = SimpleBedrockModel.modLoc("shaders/core/world_particle_expand.comp");
     private static final int CAPACITY = 16_384;
     private static final int RECORD_STRIDE = 48;
+    private static final int FACING_STRIDE = 32;
     private static final int VERTEX_STRIDE = 28;
     private static final int QUAD_VERTICES = 4;
     private static final int QUAD_INDICES = 6;
@@ -50,16 +51,21 @@ public class WorldParticleCompute {
     private final Vector3f right = new Vector3f();
     private final Vector3f up = new Vector3f();
     private final WeakHashMap<ShaderInstance, Boolean> compatibleShaders = new WeakHashMap<>();
-    private final int[] storageBuffers = new int[2];
-    private final long[] storageOffsets = new long[2];
-    private final long[] storageSizes = new long[2];
+    private final int[] storageBuffers = new int[3];
+    private final long[] storageOffsets = new long[3];
+    private final long[] storageSizes = new long[3];
+
+    private ByteBuffer facingRecords;
+    private long facingBase;
 
     private int program;
     private int vao;
     private int indices;
     private int input;
     private int output;
+    private int facingInput;
     private boolean loggedDraw;
+    private boolean loggedFacingDraw;
     private boolean loggedFallback;
 
     private BufferBuilder builder;
@@ -68,6 +74,7 @@ public class WorldParticleCompute {
     private float partialTick;
     private int count;
     private boolean collecting;
+    private boolean hasLookAt;
 
     @Nullable
     public static WorldParticleCompute begin(BufferBuilder builder) {
@@ -115,8 +122,34 @@ public class WorldParticleCompute {
             right.set(1, 0, 0).rotate(camera.rotation());
             up.set(0, 1, 0).rotate(camera.rotation());
         }
+        int facingMode = particle.computeFacingMode();
+        if (facingMode < 0 || (facingMode != 0 && !hasLookAt && !startFacingRecords())) {
+            fallBack();
+            return false;
+        }
+        if (hasLookAt) {
+            long address = facingBase + (long) count * FACING_STRIDE;
+            if (facingMode == 0) {
+                MemoryUtil.memPutInt(address + 12, 0);
+            } else {
+                particle.writeComputeFacing(address, eye, facingMode);
+            }
+        }
         particle.writeComputeRecord(recordBase + (long) count * RECORD_STRIDE, eye, partialTick);
         collected[count++] = particle;
+        return true;
+    }
+
+    private boolean startFacingRecords() {
+        if (facingRecords == null) {
+            int bytes = CAPACITY * FACING_STRIDE;
+            facingBase = MemoryUtil.nmemCalloc(1, bytes);
+            if (facingBase == 0) return false;
+            facingRecords = MemoryUtil.memByteBuffer(facingBase, bytes);
+        }
+        // Particles already staged in this batch all use the shared camera axes.
+        MemoryUtil.memSet(facingBase, 0, (long) count * FACING_STRIDE);
+        hasLookAt = true;
         return true;
     }
 
@@ -160,6 +193,7 @@ public class WorldParticleCompute {
         camera = null;
         eye = null;
         collecting = false;
+        hasLookAt = false;
     }
 
     public static void writeRecord(long address, float x, float y, float z, float roll, ParticleInstance data,
@@ -180,15 +214,31 @@ public class WorldParticleCompute {
         MemoryUtil.memPutFloat(address + 44, data.v1);
     }
 
+    static void writeFacing(long address, int mode, float dx, float dy, float dz, ParticleInstance data) {
+        MemoryUtil.memPutFloat(address, dx);
+        MemoryUtil.memPutFloat(address + 4, dy);
+        MemoryUtil.memPutFloat(address + 8, dz);
+        MemoryUtil.memPutInt(address + 12, mode);
+        if (mode == 3) {
+            MemoryUtil.memPutFloat(address + 16, data.vx);
+            MemoryUtil.memPutFloat(address + 20, data.vy);
+            MemoryUtil.memPutFloat(address + 24, data.vz);
+        }
+    }
+
     private void initialize() throws IOException {
         program = loadProgram();
         vao = glCreateVertexArrays();
         indices = glCreateBuffers();
         input = glCreateBuffers();
         output = glCreateBuffers();
-        if (vao == 0 || indices == 0 || input == 0 || output == 0) {
+        facingInput = glCreateBuffers();
+        if (vao == 0 || indices == 0 || input == 0 || output == 0 || facingInput == 0) {
             throw new IllegalStateException("Could not allocate world particle buffer objects");
         }
+
+        // The Orientations block remains active even when HasLookAt is false.
+        glNamedBufferData(facingInput, FACING_STRIDE, GL_STREAM_DRAW);
 
         IntBuffer quadIndices = MemoryUtil.memAllocInt(CAPACITY * QUAD_INDICES);
         try {
@@ -257,6 +307,10 @@ public class WorldParticleCompute {
             records.limit(count * RECORD_STRIDE);
             glNamedBufferData(input, records, GL_STREAM_DRAW);
             glNamedBufferData(output, (long) count * QUAD_VERTICES * VERTEX_STRIDE, GL_STREAM_DRAW);
+            if (hasLookAt) {
+                facingRecords.limit(count * FACING_STRIDE);
+                glNamedBufferData(facingInput, facingRecords, GL_STREAM_DRAW);
+            }
 
             int previousProgram = glGetInteger(GL_CURRENT_PROGRAM);
             int previousStorage = glGetInteger(GL_SHADER_STORAGE_BUFFER_BINDING);
@@ -270,10 +324,12 @@ public class WorldParticleCompute {
             try {
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, input);
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, output);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, facingInput);
                 GlStateManager._glUseProgram(program);
                 glUniform1ui(0, count);
                 glUniform3f(1, right.x, right.y, right.z);
                 glUniform3f(2, up.x, up.y, up.z);
+                glUniform1i(3, hasLookAt ? 1 : 0);
                 glDispatchCompute((count + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE, 1, 1);
                 glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
             } finally {
@@ -311,6 +367,10 @@ public class WorldParticleCompute {
                 SimpleBedrockModel.LOGGER.debug("World particle compute submitted its first batch ({} particles)", count);
                 loggedDraw = true;
             }
+            if (hasLookAt && !loggedFacingDraw) {
+                SimpleBedrockModel.LOGGER.debug("World particle compute submitted its first batch with LOOKAT ({} particles)", count);
+                loggedFacingDraw = true;
+            }
         } finally {
             try {
                 shader.clear();
@@ -343,7 +403,9 @@ public class WorldParticleCompute {
         glDeleteBuffers(indices);
         glDeleteBuffers(input);
         glDeleteBuffers(output);
+        glDeleteBuffers(facingInput);
         glDeleteProgram(program);
         MemoryUtil.memFree(records);
+        if (facingRecords != null) MemoryUtil.memFree(facingRecords);
     }
 }

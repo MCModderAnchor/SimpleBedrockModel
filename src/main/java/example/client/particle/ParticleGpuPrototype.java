@@ -4,7 +4,9 @@ import com.github.argon4w.acceleratedrendering.core.backends.programs.ComputePro
 import com.github.argon4w.acceleratedrendering.core.backends.programs.Uniform;
 import com.github.argon4w.acceleratedrendering.core.programs.ComputeShaderProgramLoader;
 import com.github.argon4w.acceleratedrendering.core.programs.ComputeShaderPrograms;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.data.component.ParticleAppearanceBillboard.FaceCameraMode;
 import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.runtime.ParticleInstance;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.particle.world.SnowStormParticle;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.render.MeshBatchRenderer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferUploader;
@@ -15,11 +17,15 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +33,7 @@ import java.util.Objects;
 
 import static org.lwjgl.opengl.GL46.*;
 
-/** Development-only backends for a single, order-preserving ROTATE_XYZ batch. */
+/** Development-only backends for a single, order-preserving particle batch. */
 abstract class ParticleGpuPrototype implements AutoCloseable {
     private static final int QUAD_VERTICES = 4;
     private static final int QUAD_INDICES = 6;
@@ -119,12 +125,18 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
         private final ByteBuffer records;
         private final long recordAddress;
         private final int capacity;
+        private final int stride;
         private boolean rawRecordWrites;
 
         Compact(int capacity, int indexQuads) {
+            this(capacity, indexQuads, RECORD_STRIDE);
+        }
+
+        Compact(int capacity, int indexQuads, int stride) {
             super(indexQuads);
             this.capacity = capacity;
-            records = MemoryUtil.memAlloc(capacity * RECORD_STRIDE);
+            this.stride = stride;
+            records = MemoryUtil.memAlloc(capacity * stride);
             recordAddress = MemoryUtil.memAddress(records);
         }
 
@@ -150,9 +162,13 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
             records.putFloat(data.u0).putFloat(data.v0).putFloat(data.u1).putFloat(data.v1);
         }
 
-        private void packByAddress(float x, float y, float z, float roll, ParticleInstance data, int color, int light) {
+        final long nextRecordAddress() {
             if (count >= capacity) throw new IllegalStateException("Particle record buffer is full");
-            long address = recordAddress + (long) count * RECORD_STRIDE;
+            return recordAddress + (long) count * stride;
+        }
+
+        private void packByAddress(float x, float y, float z, float roll, ParticleInstance data, int color, int light) {
+            long address = nextRecordAddress();
             MemoryUtil.memPutFloat(address, x);
             MemoryUtil.memPutFloat(address + 4, y);
             MemoryUtil.memPutFloat(address + 8, z);
@@ -169,7 +185,7 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
 
         final void upload() {
             if (rawRecordWrites) {
-                records.limit(count * RECORD_STRIDE);
+                records.limit(count * stride);
             } else {
                 records.flip();
             }
@@ -225,15 +241,19 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
         }
     }
 
-    static final class CustomCompute extends Compact {
+    static class CustomCompute extends Compact {
         private static final ResourceLocation KERNEL = new ResourceLocation("example", "shaders/core/world_particle_expand.comp");
         private final int outputBuffer = glCreateBuffers();
         private final StorageBindings storage = new StorageBindings(0, 1);
         private final int program;
 
         static int loadProgram(ResourceProvider resources) throws IOException {
+            return loadProgram(resources, KERNEL);
+        }
+
+        static int loadProgram(ResourceProvider resources, ResourceLocation kernel) throws IOException {
             String source;
-            try (var stream = resources.open(KERNEL)) {
+            try (var stream = resources.open(kernel)) {
                 source = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
             }
             int shader = glCreateShader(GL_COMPUTE_SHADER);
@@ -241,7 +261,7 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
                 glShaderSource(shader, source);
                 glCompileShader(shader);
                 if (glGetShaderi(shader, GL_COMPILE_STATUS) == GL_FALSE) {
-                    throw new IOException(KERNEL + " compilation failed: " + glGetShaderInfoLog(shader));
+                    throw new IOException(kernel + " compilation failed: " + glGetShaderInfoLog(shader));
                 }
                 int program = glCreateProgram();
                 glAttachShader(program, shader);
@@ -250,7 +270,7 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
                 if (glGetProgrami(program, GL_LINK_STATUS) == GL_FALSE) {
                     String log = glGetProgramInfoLog(program);
                     glDeleteProgram(program);
-                    throw new IOException(KERNEL + " linking failed: " + log);
+                    throw new IOException(kernel + " linking failed: " + log);
                 }
                 return program;
             } finally {
@@ -259,7 +279,11 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
         }
 
         CustomCompute(int capacity, int program) {
-            super(capacity, capacity);
+            this(capacity, program, RECORD_STRIDE);
+        }
+
+        CustomCompute(int capacity, int program, int recordStride) {
+            super(capacity, capacity, recordStride);
             this.program = program;
             glVertexArrayVertexBuffer(vao, 0, outputBuffer, 0, PARTICLE_STRIDE);
             attribute(0, 3, GL_FLOAT, false, 0);
@@ -277,9 +301,7 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
                 storage.bind(0, inputBuffer);
                 storage.bind(1, outputBuffer);
                 glUseProgram(program);
-                glUniform1ui(0, count);
-                glUniform3f(1, right.x, right.y, right.z);
-                glUniform3f(2, up.x, up.y, up.z);
+                setUniforms();
                 glDispatchCompute((count + COMPUTE_LOCAL_SIZE - 1) / COMPUTE_LOCAL_SIZE, 1, 1);
                 glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
             } finally {
@@ -289,11 +311,86 @@ abstract class ParticleGpuPrototype implements AutoCloseable {
             drawExpanded();
         }
 
+        void setUniforms() {
+            glUniform1ui(0, count);
+            glUniform3f(1, right.x, right.y, right.z);
+            glUniform3f(2, up.x, up.y, up.z);
+        }
+
         @Override
         public void close() {
             super.close();
             glDeleteBuffers(outputBuffer);
             glDeleteProgram(program);
+        }
+    }
+
+    static final class LookAtCompute extends CustomCompute {
+        private static final ResourceLocation KERNEL = new ResourceLocation("example", "shaders/core/world_particle_look_at.comp");
+        private static final MethodHandle CPU_FACING = cpuFacingMethod();
+        private final Quaternionf facing = new Quaternionf();
+        private final Vector3f axisX = new Vector3f();
+        private final Vector3f axisY = new Vector3f();
+        private int gpuFacingMode;
+
+        LookAtCompute(int capacity, ResourceProvider resources) throws IOException {
+            super(capacity, loadProgram(resources, KERNEL), RECORD_STRIDE + 32);
+            setRawRecordWrites(true);
+        }
+
+        void setFacingMode(FaceCameraMode mode, boolean gpu) {
+            gpuFacingMode = gpu ? switch (mode) {
+                case LOOKAT_XYZ -> 1;
+                case LOOKAT_Y -> 2;
+                case LOOKAT_DIRECTION -> 3;
+                default -> throw new IllegalArgumentException("Expected a look-at facing mode");
+            } : 0;
+        }
+
+        void pushFacing(SnowStormParticle particle, Camera camera, double currentX, double currentY, double currentZ,
+                        double x, double y, double z, float roll, ParticleInstance data,
+                        float r, float g, float b, float a, int light) {
+            long extra = nextRecordAddress() + RECORD_STRIDE;
+            if (gpuFacingMode == 0) {
+                // Exercise the exact CPU implementation without exposing a production benchmark API.
+                facing.identity();
+                try {
+                    CPU_FACING.invokeExact(particle, facing, camera);
+                } catch (Throwable failure) {
+                    throw new IllegalStateException("Could not evaluate the CPU particle orientation", failure);
+                }
+                if (roll != 0) facing.rotateZ(roll);
+                axisX.set(1, 0, 0).rotate(facing).mul(data.width * data.spawnScale);
+                axisY.set(0, 1, 0).rotate(facing).mul(data.height * data.spawnScale);
+                writeVector(extra, axisX.x, axisX.y, axisX.z);
+                writeVector(extra + 16, axisY.x, axisY.y, axisY.z);
+            } else {
+                var eye = camera.getPosition();
+                writeVector(extra, (float) (eye.x - currentX), (float) (eye.y - currentY), (float) (eye.z - currentZ));
+                writeVector(extra + 16, data.vx, data.vy, data.vz);
+            }
+            push(camera, x, y, z, roll, data, r, g, b, a, light);
+        }
+
+        private static void writeVector(long address, float x, float y, float z) {
+            MemoryUtil.memPutFloat(address, x);
+            MemoryUtil.memPutFloat(address + 4, y);
+            MemoryUtil.memPutFloat(address + 8, z);
+        }
+
+        private static MethodHandle cpuFacingMethod() {
+            try {
+                return MethodHandles.privateLookupIn(SnowStormParticle.class, MethodHandles.lookup()).findVirtual(
+                        SnowStormParticle.class, "applyFacingMode", MethodType.methodType(void.class, Quaternionf.class, Camera.class));
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Could not find the CPU particle orientation method", e);
+            }
+        }
+
+        @Override
+        void setUniforms() {
+            super.setUniforms();
+            glUniform1i(3, gpuFacingMode);
         }
     }
 

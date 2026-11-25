@@ -60,6 +60,8 @@ minecraft {
                 property 'sbm.worldParticleBenchmark.largeBatches', project.hasProperty('sbmParticleBenchmarkLargeBatches').toString()
                 property 'sbm.worldParticleBenchmark.cpuIsolation', project.hasProperty('sbmParticleBenchmarkCpuIsolation').toString()
                 property 'sbm.worldParticleBenchmark.productionCompute', project.hasProperty('sbmParticleBenchmarkProductionCompute').toString()
+                property 'sbm.worldParticleBenchmark.facingModes', project.hasProperty('sbmParticleBenchmarkFacingModes').toString()
+                property 'sbm.worldParticleBenchmark.facingTwoSided', project.hasProperty('sbmParticleBenchmarkFacingTwoSided').toString()
                 def shaderPack = project.findProperty('sbmParticleBenchmarkShaderPack')
                 if (shaderPack != null) {
                     property 'sbm.worldParticleBenchmark.shaderPack', shaderPack.toString()

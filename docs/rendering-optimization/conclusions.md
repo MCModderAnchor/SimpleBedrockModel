@@ -18,7 +18,7 @@
 
 ## 光影兼容
 
-正式后端通过客户端配置 `config/simplebedrockmodel-world-particles-client.toml` 中的 `compute = true` 启用。OpenGL 4.5 下，六种世界粒子材质共用 `ROTATE_XYZ` 的展开路径，并沿用各自的混合和深度写入状态。粒子 UV 取 tick 更新后的值。Forge 1.20.1 在 RenderType 的 `end()` 提交，NeoForge 1.21.1 在 `ParticleEngine` 的 `BufferBuilder.build()` 提交点接入。两版都沿用引擎剔除，并在遇到不支持的粒子时按原顺序回退整批。[Forge 后端](../../src/main/java/com/github/mcmodderanchor/simplebedrockmodel/v1/particle/world/WorldParticleCompute.java) · [正式路径复测方式](experiments.md#复测方式)
+正式后端通过客户端配置 `config/simplebedrockmodel-world-particles-client.toml` 中的 `compute = true` 启用。OpenGL 4.5 下，六种世界粒子材质支持 `ROTATE_XYZ` 和三种 `LOOKAT_*` 朝向。纯 `ROTATE_XYZ` 批次只上传 48 B/粒子。批次出现 LOOKAT 时，追加按相同顺序索引的朝向记录，GPU 在同一次 dispatch 中求轴并写出四角。求轴使用最新 tick 位置，绘制中心使用插值位置。Forge 1.20.1 在 RenderType 的 `end()` 提交，NeoForge 1.21.1 在 `ParticleEngine` 的 `BufferBuilder.build()` 提交点接入。两版都沿用引擎剔除，各材质沿用原混合和深度写入状态，遇到不支持的粒子时按原顺序回退整批。[Forge 后端](../../src/main/java/com/github/mcmodderanchor/simplebedrockmodel/v1/particle/world/WorldParticleCompute.java) · [正式路径复测方式](experiments.md#复测方式)
 
 自写 compute 保留光影包的粒子着色接口。它只生成标准 `PARTICLE` 顶点，光影包仍可选择该阶段的程序并配置雾、光照、混合和 framebuffer。实例化原型用自写顶点 shader 读取每实例属性，因此接入光影包时要另外处理顶点阶段的接口。[前期兼容调研](research.md#madparticle-的-iris-framebuffer-接入) · [Iris core shader 兼容说明](https://github.com/IrisShaders/Iris/blob/26.1/docs/development/compatibility/core-shaders.md)
 
