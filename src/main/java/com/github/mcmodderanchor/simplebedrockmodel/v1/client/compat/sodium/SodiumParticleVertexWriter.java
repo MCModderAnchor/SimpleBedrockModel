@@ -41,7 +41,7 @@ public final class SodiumParticleVertexWriter {
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             SodiumVertexBufferWriter.push(writer, stack, PARTICLE_SCRATCH_BUFFER, PARTICLE_VERTEX_COUNT,
-                    SodiumVertexBufferWriter.format("ParticleVertex"));
+                    SodiumVertexBufferWriter.particleFormat());
         }
         return true;
     }

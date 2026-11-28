@@ -194,7 +194,7 @@ public final class SodiumTreeGeometryWriter implements ISodiumVertexWriter {
     public void flush(VertexBufferWriter writer, int vertexCount) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             SodiumVertexBufferWriter.push(writer, stack, SCRATCH, vertexCount,
-                    SodiumVertexBufferWriter.format("EntityVertex"));
+                    SodiumVertexBufferWriter.entityFormat());
         }
     }
 }

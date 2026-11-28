@@ -121,7 +121,7 @@ public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexW
     public void flush(VertexBufferWriter writer, int vertexCount) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             SodiumVertexBufferWriter.push(writer, stack, SCRATCH, vertexCount,
-                    SodiumVertexBufferWriter.format("EntityVertex"));
+                    SodiumVertexBufferWriter.entityFormat());
         }
     }
 }

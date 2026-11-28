@@ -20,7 +20,7 @@ public interface ISodiumVertexWriter {
     default void flush(VertexBufferWriter writer, int vertexCount) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             SodiumVertexBufferWriter.push(writer, stack, SCRATCH_BUFFER, vertexCount,
-                    SodiumVertexBufferWriter.format("EntityVertex"));
+                    SodiumVertexBufferWriter.entityFormat());
         }
     }
 
