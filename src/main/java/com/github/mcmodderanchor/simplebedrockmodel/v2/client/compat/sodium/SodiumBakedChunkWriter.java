@@ -1,6 +1,7 @@
 package com.github.mcmodderanchor.simplebedrockmodel.v2.client.compat.sodium;
 
 import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.ISodiumVertexWriter;
+import com.github.mcmodderanchor.simplebedrockmodel.v1.client.compat.sodium.SodiumVertexPush;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedGeometryChunk;
 import com.github.mcmodderanchor.simplebedrockmodel.v2.common.model.baked.BakedQuadData;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -119,7 +120,7 @@ public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexW
     @Override
     public void flush(VertexBufferWriter writer, int vertexCount) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            writer.push(stack, SCRATCH, vertexCount, EntityVertex.FORMAT);
+            SodiumVertexPush.INSTANCE.push(writer, stack, SCRATCH, vertexCount, EntityVertex.FORMAT);
         }
     }
 }

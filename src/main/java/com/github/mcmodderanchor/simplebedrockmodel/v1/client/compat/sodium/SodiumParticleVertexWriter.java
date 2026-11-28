@@ -40,7 +40,7 @@ public final class SodiumParticleVertexWriter {
         ParticleVertex.put(ptr, x3, y3, z3, u3, v3, color, light);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            writer.push(stack, PARTICLE_SCRATCH_BUFFER, PARTICLE_VERTEX_COUNT, ParticleVertex.FORMAT);
+            SodiumVertexPush.INSTANCE.push(writer, stack, PARTICLE_SCRATCH_BUFFER, PARTICLE_VERTEX_COUNT, ParticleVertex.FORMAT);
         }
         return true;
     }

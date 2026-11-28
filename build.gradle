@@ -13,8 +13,13 @@ archivesBaseName = 'simplebedrockmodel'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+sourceSets {
+    sodium0814
+}
+
 neoForge {
     version = project.neo_version
+    addModdingDependenciesTo(sourceSets.sodium0814)
     parchment {
         mappingsVersion = project.parchment_mappings_version
         minecraftVersion = project.parchment_minecraft_version
@@ -54,6 +59,7 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
+            sourceSet(sourceSets.sodium0814)
             sourceSet(sourceSets.test)
         }
     }
@@ -81,6 +87,17 @@ configurations {
 }
 
 repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'CaffeineMC'
+                url = uri('https://maven.caffeinemc.net/releases')
+            }
+        }
+        filter {
+            includeGroup 'net.caffeinemc'
+        }
+    }
     mavenLocal()
     maven {
         name = "Modrinth"
@@ -100,7 +117,20 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge"
+    // 旧版sodium
+//    implementation "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge"
+
+    // 0.8.12往后的有神秘包装
+    def sodiumVersion = '0.8.13+mc1.21.1'
+    compileOnly "net.caffeinemc:sodium-neoforge-mod:${sodiumVersion}"
+
+    // 仅针对0.8.14+方法改名
+    sodium0814CompileOnly 'net.caffeinemc:sodium-neoforge-mod:0.8.14-beta.2+mc1.21.1'
+    implementation sourceSets.sodium0814.output
+
+    additionalRuntimeClasspath("net.caffeinemc:sodium-neoforge:${sodiumVersion}") {
+        transitive = false
+    }
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
     mcLib jarJar("com.maydaymemory:mae:1.1.4") {
         exclude group: 'com.google.code.gson', module: 'gson'
@@ -117,7 +147,9 @@ dependencies {
     compileOnly "curse.maven:epic-fight-mod-405076:7734081"
 //    localRuntime "curse.maven:epic-fight-mod-405076:7734081"
     localRuntime "curse.maven:playeranimator-658587:7389814"
-    localRuntime "maven.modrinth:iris:1.8.12+1.21.1-neoforge"
+    // iris
+//    localRuntime "maven.modrinth:iris:1.8.12+1.21.1-neoforge
+    localRuntime "maven.modrinth:iris:1.8.14-beta.1+1.21.1-neoforge"
 
     // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
@@ -152,6 +184,7 @@ tasks.withType(ProcessResources).configureEach {
 
 // 生成 manifest 内容，用于填充版本信息等内容
 jar {
+    from sourceSets.sodium0814.output
     manifest {
         attributes([
                 "Specification-Title"     : mod_id,
@@ -194,6 +227,10 @@ jmh {
 java {
     // 编译源码文件，方便发布 maven
     withSourcesJar()
+}
+
+tasks.named('sourcesJar') {
+    from sourceSets.sodium0814.allSource
 }
 
 modrinth {
